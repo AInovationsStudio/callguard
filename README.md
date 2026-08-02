@@ -13,7 +13,10 @@ tasks. The manifest intentionally declares **no permissions** in this task.
 The primary build path is a container with a pinned JDK 17 and the pinned
 Android SDK platform/build-tools. No host Java, Gradle, or Android SDK is
 required. The source tree is mounted at `/workspace`; Gradle caches live in a
-named volume. No host credentials are copied into the image.
+named volume. No host credentials are copied into the image. Podman is the
+tested engine (rootless, non-root `developer` user via `--userns=keep-id`);
+Docker is supported best-effort via engine gating in the scripts
+(`CONTAINER_ENGINE=podman|docker` to override).
 
 Build the debug APK:
 
@@ -45,14 +48,20 @@ audit):
 | minSdk / targetSdk / compileSdk | 26 / 34 / 34 |
 
 All plugin and library versions live in `gradle/libs.versions.toml`.
-Dependency locking (`dependencyLocking`) and strict dependency verification
-(`dependencyVerification`) are enabled; the lockfile and verification metadata
-are committed so a fresh container build is reproducible and integrity-checked.
+Dependency locking is enabled in strict mode (`dependencyLocking` with
+`lockMode = LockMode.STRICT` in `app/build.gradle.kts`); the lockfiles
+(`app/gradle.lockfile`, `settings-gradle.lockfile`) are committed. Dependency
+verification is enforced at build time via the `--dependency-verification strict`
+flag passed by both scripts, backed by the committed
+`gradle/verification-metadata.xml` (sha-256). A fresh container build is
+reproducible and integrity-checked. The base image is pinned by immutable
+digest and the Android command-line tools archive is checked against Google's
+published sha-1 and size before install.
 
 ## Project layout
 
 ```
-settings.gradle.kts        # project + verification settings
+settings.gradle.kts        # project + repository settings
 build.gradle.kts           # top-level plugin declarations
 gradle/libs.versions.toml  # version catalog
 app/                       # application module (namespace studio.ainovations.callguard)
