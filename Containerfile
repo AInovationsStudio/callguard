@@ -20,8 +20,10 @@ ARG ANDROID_AVD_NAME=callguard-api34
 ARG ANDROID_CMDLINE_TOOLS_SHA1=d313adb7aedccf6cf0cfca51ec180f0059f5f8f8
 ARG ANDROID_CMDLINE_TOOLS_SIZE=153607504
 
-ENV ANDROID_HOME=${ANDROID_SDK_ROOT} \
+ENV HOME=/home/developer \
+    ANDROID_HOME=${ANDROID_SDK_ROOT} \
     ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT} \
+    GRADLE_USER_HOME=/home/developer/.gradle \
     PATH="${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin:${ANDROID_SDK_ROOT}/emulator:${ANDROID_SDK_ROOT}/platform-tools:${PATH}"
 
 RUN apt-get update \

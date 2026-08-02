@@ -32,6 +32,8 @@ mkdir -p docs/screenshots
     -v "$GRADLE_VOL" \
     -e ANDROID_HOME=/android-sdk \
     -e ANDROID_SDK_ROOT=/android-sdk \
+    -e HOME=/home/developer \
+    -e GRADLE_USER_HOME=/home/developer/.gradle \
     -w /workspace \
     "${USERNS_ARGS[@]}" \
     "${DEVICE_ARGS[@]}" \
