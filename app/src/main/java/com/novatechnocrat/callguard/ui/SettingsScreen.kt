@@ -38,6 +38,7 @@ fun SettingsScreen(
     onUnknownNumberActionChanged: (RuleAction) -> Unit,
     onContactMatchingToggled: (Boolean) -> Unit,
     onRepairContactsPermission: () -> Unit,
+    onRequestScreeningRole: () -> Unit = {},
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -70,6 +71,14 @@ fun SettingsScreen(
                     text = screeningRoleDescription(state.screeningRoleStatus),
                     modifier = Modifier.testTag(CallGuardTestTags.SETTINGS_SCREENING_ROLE_STATUS),
                 )
+                if (state.screeningRoleStatus == ScreeningRoleStatus.NotActive) {
+                    Button(
+                        onClick = onRequestScreeningRole,
+                        modifier = Modifier.testTag(CallGuardTestTags.SETTINGS_SCREENING_ROLE_BUTTON),
+                    ) {
+                        Text("Set CallGuard as screening app")
+                    }
+                }
             }
 
             Column {

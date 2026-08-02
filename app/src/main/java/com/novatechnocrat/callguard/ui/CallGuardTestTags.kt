@@ -43,5 +43,6 @@ object CallGuardTestTags {
     const val SETTINGS_CONTACTS_PERMISSION_STATUS = "settings_contacts_permission_status"
     const val SETTINGS_CONTACTS_REPAIR_BUTTON = "settings_contacts_repair_button"
     const val SETTINGS_SCREENING_ROLE_STATUS = "settings_screening_role_status"
+    const val SETTINGS_SCREENING_ROLE_BUTTON = "settings_screening_role_button"
     const val SETTINGS_BACK_BUTTON = "settings_back_button"
 }

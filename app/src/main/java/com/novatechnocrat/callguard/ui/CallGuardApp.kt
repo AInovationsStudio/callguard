@@ -39,9 +39,15 @@ import studio.ainovations.callguard.phone.PhoneNormalizer
 @Composable
 fun CallGuardApp(viewModel: CallGuardViewModel = rememberDefaultCallGuardViewModel()) {
     val state by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val contactsPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
+    ) {
+        viewModel.refreshPermissionState()
+    }
+    val screeningRoleLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
     ) {
         viewModel.refreshPermissionState()
     }
@@ -51,6 +57,16 @@ fun CallGuardApp(viewModel: CallGuardViewModel = rememberDefaultCallGuardViewMod
             when (event) {
                 is CallGuardEvent.RequestContactsPermission ->
                     contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+                is CallGuardEvent.RequestScreeningRole -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val roleManager = context.getSystemService(RoleManager::class.java)
+                        if (roleManager?.isRoleAvailable(RoleManager.ROLE_CALL_SCREENING) == true) {
+                            screeningRoleLauncher.launch(
+                                roleManager.createRequestRoleIntent(RoleManager.ROLE_CALL_SCREENING),
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -92,6 +108,7 @@ fun CallGuardApp(viewModel: CallGuardViewModel = rememberDefaultCallGuardViewMod
                     onUnknownNumberActionChanged = viewModel::onUnknownNumberActionChanged,
                     onContactMatchingToggled = viewModel::onContactMatchingToggled,
                     onRepairContactsPermission = viewModel::onContactsPermissionRepairRequested,
+                    onRequestScreeningRole = viewModel::onScreeningRoleRequested,
                     onBack = viewModel::onRuleListOpened,
                 )
             }

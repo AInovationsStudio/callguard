@@ -73,6 +73,7 @@ data class WizardExample(val digits: String)
 /** One-shot UI actions [CallGuardApp] performs (e.g. launching a system settings screen). */
 sealed interface CallGuardEvent {
     data object RequestContactsPermission : CallGuardEvent
+    data object RequestScreeningRole : CallGuardEvent
 }
 
 /** Read-only, non-claiming status of Android's call-screening role. See [CallGuardViewModel] constructor doc. */
@@ -403,6 +404,12 @@ class CallGuardViewModel(
     /** Explicit repair path for a missing contacts permission: opens the app's system settings page. */
     fun onContactsPermissionRepairRequested() {
         _events.tryEmit(CallGuardEvent.RequestContactsPermission)
+    }
+
+    fun onScreeningRoleRequested() {
+        if (_uiState.value.settings.screeningRoleStatus == ScreeningRoleStatus.NotActive) {
+            _events.tryEmit(CallGuardEvent.RequestScreeningRole)
+        }
     }
 
     override fun onCleared() {
