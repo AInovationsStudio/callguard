@@ -1,0 +1,36 @@
+name: CallGuard build
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  container-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run reproducible container gate
+        env:
+          CONTAINER_ENGINE: docker
+        run: ./scripts/container-test.sh
+
+      - name: Assemble debug APK
+        env:
+          CONTAINER_ENGINE: docker
+        run: ./scripts/container-build.sh
+
+      - name: Upload APK and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: callguard-debug-and-reports
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/reports/
+            app/build/test-results/
+          if-no-files-found: ignore

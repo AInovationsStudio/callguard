@@ -4,9 +4,10 @@ Offline-first Android app for blocking or allowing incoming cellular calls
 using understandable, country-aware rules. Android package:
 `studio.ainovations.callguard`.
 
-This repository is in early scaffolding (Task 1 of the MVP plan). The launcher
-activity exists; call-screening, persistence, and rule logic arrive in later
-tasks. The manifest intentionally declares **no permissions** in this task.
+The MVP includes a guided Compose rule editor, country-aware normalization,
+Room persistence, and an Android `CallScreeningService`. Screening is inactive
+until the user selects CallGuard as the system call-screening app. Contact
+matching is optional and requires an explicit contacts permission grant.
 
 ## Reproducible container build
 
@@ -27,12 +28,39 @@ Build the debug APK:
 Expected: `app/build/outputs/apk/debug/app-debug.apk` is produced and the
 command exits 0.
 
-Run the deterministic local gate (formatting, lint, unit tests, manifest
+Run the deterministic local gate (formatting, lint, unit tests, and manifest
 audit):
 
 ```bash
 ./scripts/container-test.sh
 ```
+
+Run Compose and service contract tests on the pinned API-34 emulator:
+
+```bash
+./scripts/container-test.sh --instrumentation
+```
+
+Capture the verified GUI screens:
+
+```bash
+./scripts/capture-screenshots.sh
+```
+
+The emulator is created inside the container and uses `/dev/kvm` when
+available. Instrumentation is a hard failure when the emulator cannot boot; it
+is never silently skipped.
+
+Check dependency integrity directly:
+
+```bash
+./scripts/verify-dependencies.sh
+```
+
+On Android, open CallGuard settings and tap **Set CallGuard as screening app**.
+The system role dialog is authoritative; CallGuard never claims the role is
+active based only on the user's intent. Unknown or unparseable caller IDs use
+the configured fallback action, which defaults to allow.
 
 ## Toolchain pins
 
@@ -67,5 +95,6 @@ gradle/libs.versions.toml  # version catalog
 app/                       # application module (namespace studio.ainovations.callguard)
 Containerfile              # reproducible build image
 .devcontainer/             # VS Code dev container
-scripts/                   # container-build.sh, container-test.sh, manifest-audit.sh
+scripts/                   # build, tests, emulator, manifest, and dependency gates
+docs/screenshots/          # emulator-captured GUI snapshots
 ```
