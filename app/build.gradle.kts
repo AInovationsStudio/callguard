@@ -70,6 +70,7 @@ dependencies {
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
     debugImplementation(libs.compose.ui.tooling)
+    debugImplementation(libs.compose.ui.test.manifest)
 
     testImplementation(libs.junit)
     implementation(libs.libphonenumber)
@@ -79,6 +80,16 @@ dependencies {
     kapt(libs.room.compiler)
     implementation(libs.datastore.preferences)
     implementation(libs.kotlinx.coroutines.core)
+
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.core)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.room.runtime)
+    androidTestImplementation(libs.room.ktx)
+    androidTestImplementation(libs.datastore.preferences)
+    androidTestImplementation(libs.kotlinx.coroutines.core)
 }
 
 kapt {
