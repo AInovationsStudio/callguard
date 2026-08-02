@@ -67,6 +67,7 @@ dependencies {
     debugImplementation(libs.compose.ui.tooling)
 
     testImplementation(libs.junit)
+    implementation(libs.libphonenumber)
 }
 
 dependencyLocking {
