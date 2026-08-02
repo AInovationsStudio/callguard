@@ -46,6 +46,8 @@ fun RuleWizardScreen(
     onPreviewTested: (String) -> Unit,
     onSave: () -> Unit,
     onCancel: () -> Unit,
+    contactsPermissionGranted: Boolean = false,
+    onRequestContactsPermission: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -82,11 +84,15 @@ fun RuleWizardScreen(
 
         MatcherInputFields(state = state, onInputChanged = onInputChanged)
 
-        CountryPicker(
-            selected = state.country,
-            options = availableRegions,
-            onSelected = { onInputChanged(WizardField.COUNTRY, it.orEmpty()) },
-        )
+        if (state.matcherType == WizardMatcherType.EXACT_NUMBER ||
+            state.matcherType == WizardMatcherType.SPECIFIC_NUMBERS
+        ) {
+            CountryPicker(
+                selected = state.country,
+                options = availableRegions,
+                onSelected = { onInputChanged(WizardField.COUNTRY, it.orEmpty()) },
+            )
+        }
         if (state.needsRegionOptions.isNotEmpty()) {
             Text(
                 "This number could be from more than one country: ${state.needsRegionOptions.joinToString(", ")}. " +
@@ -115,6 +121,19 @@ fun RuleWizardScreen(
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.testTag(CallGuardTestTags.WIZARD_CONFLICT_WARNING_PREFIX + index),
             )
+        }
+        if (state.matcherType == WizardMatcherType.CONTACTS && !contactsPermissionGranted) {
+            Text(
+                "Contacts access is missing, so this rule will stay disabled until you grant permission.",
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.testTag(CallGuardTestTags.WIZARD_CONTACTS_PERMISSION_WARNING),
+            )
+            OutlinedButton(
+                onClick = onRequestContactsPermission,
+                modifier = Modifier.testTag(CallGuardTestTags.WIZARD_CONTACTS_PERMISSION_BUTTON),
+            ) {
+                Text("Enable contacts access")
+            }
         }
 
         if (state.positiveExample != null || state.negativeExample != null) {
@@ -154,6 +173,7 @@ fun RuleWizardScreen(
             onTestRequested = onPreviewTested,
             result = state.previewResult,
             error = state.previewError,
+            stale = state.previewStale,
         )
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -29,6 +29,7 @@ fun RulePreviewScreen(
     onTestRequested: (String) -> Unit,
     result: MatchResult?,
     error: String?,
+    stale: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.padding(vertical = 8.dp)) {
@@ -64,6 +65,13 @@ fun RulePreviewScreen(
         }
         if (result != null) {
             Column(modifier = Modifier.padding(top = 8.dp)) {
+                if (stale) {
+                    Text(
+                        "Preview is out of date; test again after changing the rule.",
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.testTag(CallGuardTestTags.PREVIEW_STALE),
+                    )
+                }
                 Text(
                     text = "Result: ${result.action.name}",
                     style = MaterialTheme.typography.bodyMedium,

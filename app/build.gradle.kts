@@ -80,6 +80,7 @@ dependencies {
     kapt(libs.room.compiler)
     implementation(libs.datastore.preferences)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.lifecycle.viewmodel.compose)
 
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)

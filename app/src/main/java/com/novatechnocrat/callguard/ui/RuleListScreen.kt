@@ -104,7 +104,10 @@ private fun RuleRow(
                 onCheckedChange = { onToggleRule(item.id, it) },
                 modifier = Modifier.testTag(CallGuardTestTags.RULE_TOGGLE_PREFIX + item.id),
             )
-            TextButton(onClick = { onEditRule(item.id) }) {
+            TextButton(
+                onClick = { onEditRule(item.id) },
+                modifier = Modifier.testTag(CallGuardTestTags.RULE_EDIT_PREFIX + item.id),
+            ) {
                 Text("Edit")
             }
             TextButton(

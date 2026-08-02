@@ -3,23 +3,27 @@ package studio.ainovations.callguard.ui
 import android.Manifest
 import android.app.role.RoleManager
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
-import android.provider.Settings
 import android.telephony.TelephonyManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
 import studio.ainovations.callguard.data.CallGuardDatabase
 import studio.ainovations.callguard.data.PreferencesRepository
 import studio.ainovations.callguard.data.RuleRepository
@@ -35,20 +39,27 @@ import studio.ainovations.callguard.phone.PhoneNormalizer
 @Composable
 fun CallGuardApp(viewModel: CallGuardViewModel = rememberDefaultCallGuardViewModel()) {
     val state by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val contactsPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) {
+        viewModel.refreshPermissionState()
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             when (event) {
-                is CallGuardEvent.OpenContactsPermissionSettings -> {
-                    val intent = Intent(
-                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                        Uri.fromParts("package", context.packageName, null),
-                    )
-                    context.startActivity(intent)
-                }
+                is CallGuardEvent.RequestContactsPermission ->
+                    contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
             }
         }
+    }
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshPermissionState()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     MaterialTheme {
@@ -71,6 +82,8 @@ fun CallGuardApp(viewModel: CallGuardViewModel = rememberDefaultCallGuardViewMod
                     onPreviewTested = viewModel::onPreviewTested,
                     onSave = viewModel::onRuleSaved,
                     onCancel = viewModel::onWizardCancelled,
+                    contactsPermissionGranted = state.settings.contactsPermissionGranted,
+                    onRequestContactsPermission = viewModel::onContactsPermissionRepairRequested,
                 )
                 is CallGuardScreen.Settings -> SettingsScreen(
                     state = state.settings,
@@ -89,16 +102,21 @@ fun CallGuardApp(viewModel: CallGuardViewModel = rememberDefaultCallGuardViewMod
 @Composable
 private fun rememberDefaultCallGuardViewModel(): CallGuardViewModel {
     val context = LocalContext.current.applicationContext
-    return remember {
-        val database = CallGuardDatabase.build(context)
-        CallGuardViewModel(
-            ruleRepository = RuleRepository(database.ruleDao()),
-            preferencesRepository = PreferencesRepository(context.callGuardDataStore),
-            normalizer = PhoneNormalizer(deviceRegion = { deviceRegionFor(context) }),
-            contactsPermissionGranted = { contactsPermissionGranted(context) },
-            screeningRoleStatus = { screeningRoleStatusFor(context) },
-        )
-    }
+    return viewModel(
+        factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                val database = CallGuardDatabase.build(context)
+                return CallGuardViewModel(
+                    ruleRepository = RuleRepository(database.ruleDao()),
+                    preferencesRepository = PreferencesRepository(context.callGuardDataStore),
+                    normalizer = PhoneNormalizer(deviceRegion = { deviceRegionFor(context) }),
+                    contactsPermissionGranted = { contactsPermissionGranted(context) },
+                    screeningRoleStatus = { screeningRoleStatusFor(context) },
+                ) as T
+            }
+        },
+    )
 }
 
 /**

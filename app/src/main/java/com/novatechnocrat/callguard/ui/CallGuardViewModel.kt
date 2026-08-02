@@ -1,5 +1,6 @@
 package studio.ainovations.callguard.ui
 
+import androidx.lifecycle.ViewModel
 import com.google.i18n.phonenumbers.PhoneNumberUtil
 import studio.ainovations.callguard.data.CallGuardPreferences
 import studio.ainovations.callguard.data.PreferencesRepository
@@ -16,6 +17,7 @@ import studio.ainovations.callguard.phone.PhoneNumberInput
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -24,6 +26,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.math.BigInteger
 import java.util.UUID
 
@@ -68,7 +72,7 @@ data class WizardExample(val digits: String)
 
 /** One-shot UI actions [CallGuardApp] performs (e.g. launching a system settings screen). */
 sealed interface CallGuardEvent {
-    data object OpenContactsPermissionSettings : CallGuardEvent
+    data object RequestContactsPermission : CallGuardEvent
 }
 
 /** Read-only, non-claiming status of Android's call-screening role. See [CallGuardViewModel] constructor doc. */
@@ -108,6 +112,7 @@ data class WizardState(
     val previewInput: String = "",
     val previewResult: MatchResult? = null,
     val previewError: String? = null,
+    val previewStale: Boolean = false,
     val canSave: Boolean = false,
 )
 
@@ -168,8 +173,9 @@ class CallGuardViewModel(
     private val contactsPermissionGranted: () -> Boolean = { false },
     private val screeningRoleStatus: () -> ScreeningRoleStatus = { ScreeningRoleStatus.Unsupported },
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
-) {
+) : ViewModel() {
 
+    private val mutationMutex = Mutex()
     private val _uiState = MutableStateFlow(
         CallGuardUiState(availableRegions = PhoneNumberUtil.getInstance().supportedRegions.sorted()),
     )
@@ -292,57 +298,88 @@ class CallGuardViewModel(
         val updated = if (rawNumber.isBlank()) {
             wizard.copy(previewInput = rawNumber, previewResult = null, previewError = "Enter a number to test.")
         } else {
-            when (val normalized = normalizer.normalize(PhoneNumberInput(rawNumber, wizard.country))) {
-                is PhoneNormalizationResult.Valid -> {
-                    val result = RuleSnapshot.compile(effectiveRules).evaluate(normalized.phone.digits, emptySet())
-                    wizard.copy(previewInput = rawNumber, previewResult = result, previewError = null)
+            runCatching {
+                when (val normalized = normalizer.normalize(PhoneNumberInput(rawNumber, wizard.country))) {
+                    is PhoneNormalizationResult.Valid -> {
+                        require(candidate != null) { wizard.validationError ?: "Finish the rule before testing a number." }
+                        RuleSnapshot.compile(effectiveRules).evaluate(normalized.phone.digits, emptySet())
+                    }
+                    is PhoneNormalizationResult.NeedsRegion -> throw PreviewValidationException(
+                        "This number could belong to more than one country; choose a country above and try again.",
+                    )
+                    is PhoneNormalizationResult.Invalid -> throw PreviewValidationException(
+                        "Enter a valid phone number: ${normalized.reason}",
+                    )
                 }
-                is PhoneNormalizationResult.NeedsRegion -> wizard.copy(
-                    previewInput = rawNumber,
-                    previewResult = null,
-                    previewError = "This number could belong to more than one country; choose a country above and try again.",
-                )
-                is PhoneNormalizationResult.Invalid -> wizard.copy(
-                    previewInput = rawNumber,
-                    previewResult = null,
-                    previewError = "Enter a valid phone number: ${normalized.reason}",
-                )
-            }
+            }.fold(
+                onSuccess = { result ->
+                    wizard.copy(previewInput = rawNumber, previewResult = result, previewError = null, previewStale = false)
+                },
+                onFailure = { error ->
+                    wizard.copy(
+                        previewInput = rawNumber,
+                        previewResult = null,
+                        previewError = error.message ?: "Could not test this number.",
+                        previewStale = false,
+                    )
+                },
+            )
         }
         _uiState.update { it.copy(wizard = updated) }
     }
 
     /** Saves the wizard's current rule. A no-op if [WizardState.canSave] is false. */
     fun onRuleSaved() {
-        val state = _uiState.value
-        val wizard = state.wizard
-        val matcher = (validateMatcher(wizard) as? MatcherValidation.Valid)?.matcher ?: return
-        val id = wizard.editingRuleId ?: UUID.randomUUID().toString()
-        val newRule = BlockingRule(
-            id = id,
-            name = wizard.name.ifBlank { defaultRuleName(wizard.matcherType, wizard.action) },
-            enabled = true,
-            action = wizard.action,
-            matcher = matcher,
-            priority = wizard.priority,
-        )
-        val updatedRules = if (wizard.editingRuleId != null) {
-            state.rules.map { if (it.id == id) newRule else it }
-        } else {
-            state.rules + newRule
+        scope.launch {
+            mutationMutex.withLock {
+                val state = _uiState.value
+                val wizard = state.wizard
+                val matcher = (validateMatcher(wizard) as? MatcherValidation.Valid)?.matcher ?: return@withLock
+                val id = wizard.editingRuleId ?: UUID.randomUUID().toString()
+                val newRule = BlockingRule(
+                    id = id,
+                    name = wizard.name.ifBlank { defaultRuleName(wizard.matcherType, wizard.action) },
+                    enabled = true,
+                    action = wizard.action,
+                    matcher = matcher,
+                    priority = wizard.priority,
+                )
+                val updatedRules = if (wizard.editingRuleId != null) {
+                    state.rules.map { if (it.id == id) newRule else it }
+                } else {
+                    state.rules + newRule
+                }
+                ruleRepository.replaceRules(updatedRules)
+                _uiState.update { current ->
+                    current.copy(
+                        rules = updatedRules,
+                        ruleListItems = updatedRules.map(::toListItem),
+                        screen = CallGuardScreen.RuleList,
+                        wizard = WizardState(),
+                    )
+                }
+            }
         }
-        scope.launch { ruleRepository.replaceRules(updatedRules) }
-        _uiState.update { it.copy(screen = CallGuardScreen.RuleList, wizard = WizardState()) }
     }
 
     fun onRuleToggled(ruleId: String, enabled: Boolean) {
-        val updated = _uiState.value.rules.map { if (it.id == ruleId) it.copy(enabled = enabled) else it }
-        scope.launch { ruleRepository.replaceRules(updated) }
+        scope.launch {
+            mutationMutex.withLock {
+                val updated = _uiState.value.rules.map { if (it.id == ruleId) it.copy(enabled = enabled) else it }
+                ruleRepository.replaceRules(updated)
+                publishRules(updated)
+            }
+        }
     }
 
     fun onRuleDeleted(ruleId: String) {
-        val updated = _uiState.value.rules.filterNot { it.id == ruleId }
-        scope.launch { ruleRepository.replaceRules(updated) }
+        scope.launch {
+            mutationMutex.withLock {
+                val updated = _uiState.value.rules.filterNot { it.id == ruleId }
+                ruleRepository.replaceRules(updated)
+                publishRules(updated)
+            }
+        }
     }
 
     // --- Settings ---
@@ -361,13 +398,34 @@ class CallGuardViewModel(
 
     /** Explicit repair path for a missing contacts permission: opens the app's system settings page. */
     fun onContactsPermissionRepairRequested() {
-        _events.tryEmit(CallGuardEvent.OpenContactsPermissionSettings)
+        _events.tryEmit(CallGuardEvent.RequestContactsPermission)
+    }
+
+    override fun onCleared() {
+        scope.cancel()
+        super.onCleared()
     }
 
     // --- Wizard derivation (validation, examples, conflicts) ---
 
     private fun updateWizard(transform: (WizardState) -> WizardState) {
-        _uiState.update { state -> state.copy(wizard = recomputeWizard(transform(state.wizard), state.rules)) }
+        _uiState.update { state ->
+            val changed = transform(state.wizard)
+            state.copy(
+                wizard = recomputeWizard(
+                    changed.copy(
+                        previewStale = changed.previewStale || changed.previewResult != null,
+                    ),
+                    state.rules,
+                ),
+            )
+        }
+    }
+
+    private fun publishRules(rules: List<BlockingRule>) {
+        _uiState.update { state ->
+            state.copy(rules = rules, ruleListItems = rules.map(::toListItem), wizard = recomputeWizard(state.wizard, rules))
+        }
     }
 
     private fun recomputeWizard(wizard: WizardState, existingRules: List<BlockingRule>): WizardState {
@@ -679,4 +737,6 @@ class CallGuardViewModel(
         const val EXAMPLE_FILLER = "4"
         val BROAD_REGEX_PATTERNS = setOf(".*", ".+", "\\d*", "\\d+", "[0-9]*", "[0-9]+", "^.*$", "^.+$")
     }
+
+    private class PreviewValidationException(message: String) : IllegalArgumentException(message)
 }

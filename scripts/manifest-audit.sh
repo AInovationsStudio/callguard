@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Manifest permission audit for CallGuard.
-# Task 1 declares only the application and launcher activity and adds NO
-# permissions. This script fails if any <uses-permission> is present, if the
+# concurrency and UI work declares only READ_CONTACTS for the explicitly user-triggered contact
+# rule flow. This script fails if any other permission is present, if the
 # launcher activity is missing or not exported, or if a second activity is
 # declared. The call-screening service is intentionally NOT declared here; it
 # arrives in screening service once its behavior is tested.
@@ -15,13 +15,19 @@ if [[ ! -f "$MANIFEST" ]]; then
     exit 1
 fi
 
-# 1. No permissions at all in Task 1.
+# 1. Only READ_CONTACTS is allowed in concurrency and UI work.
 PERM_COUNT=$(grep -c "<uses-permission" "$MANIFEST" || true)
-if [[ "$PERM_COUNT" -ne 0 ]]; then
-    echo "error: manifest declares $PERM_COUNT <uses-permission> element(s); Task 1 allows none." >&2
-    grep -n "<uses-permission" "$MANIFEST" >&2
+if [[ "$PERM_COUNT" -ne 1 ]] || ! grep -q 'android.permission.READ_CONTACTS' "$MANIFEST"; then
+    echo "error: manifest must declare exactly android.permission.READ_CONTACTS and no other permissions." >&2
+    grep -n "<uses-permission" "$MANIFEST" >&2 || true
     exit 1
 fi
+for FORBIDDEN in INTERNET SEND_SMS RECORD_AUDIO ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION; do
+    if grep -q "android.permission.$FORBIDDEN" "$MANIFEST"; then
+        echo "error: forbidden permission android.permission.$FORBIDDEN declared." >&2
+        exit 1
+    fi
+done
 
 # 2. Exactly one activity, exported, with MAIN/LAUNCHER.
 ACTIVITY_COUNT=$(grep -c "<activity" "$MANIFEST" || true)
@@ -56,4 +62,4 @@ for TAG in "<service" "<receiver" "<provider"; do
     fi
 done
 
-echo "[manifest-audit] OK: no permissions, single exported launcher activity, no service/receiver/provider."
+echo "[manifest-audit] OK: READ_CONTACTS only, single exported launcher activity, no service/receiver/provider."
