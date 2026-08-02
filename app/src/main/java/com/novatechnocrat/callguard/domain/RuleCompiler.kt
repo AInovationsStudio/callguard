@@ -10,11 +10,15 @@ import java.math.BigInteger
  * evaluation so a caller that compiles at save time can never observe a
  * partially applied rule set at call time.
  *
- * Note: `evaluate` recompiles every enabled rule on each call, which is fine
- * for the rule compiler unit-test surface but wasteful on the screening hot path.
- * persistence layer's `RuleSnapshot` is expected to compile (and cache the compiled
- * [java.util.regex.Pattern] and `Range` bounds) once per atomic snapshot
- * publication and reuse the cached form across evaluations.
+ * [compile] performs the expensive work exactly once per call — validating
+ * every enabled rule and caching its compiled [java.util.regex.Pattern] or
+ * `Range` [java.math.BigInteger] bounds in the returned [CompiledRuleSet].
+ * [evaluate] is a convenience that compiles and evaluates in one step; it is
+ * fine for one-off calls (previews, tests) but recompiles on every
+ * invocation. A caller that evaluates many numbers against the same rule set
+ * — such as `data.RuleSnapshot`, which publishes one [CompiledRuleSet] per
+ * atomic snapshot — should call [compile] once and reuse
+ * [CompiledRuleSet.evaluate] so the screening hot path pays no compile cost.
  */
 object RuleCompiler {
 
@@ -23,16 +27,10 @@ object RuleCompiler {
 
     /**
      * Evaluate [numberDigits] (canonical digit-only form) against [rules],
-     * resolving [RuleMatcher.Contacts] against [contacts].
-     *
-     * Enabled rules whose matcher accepts the number are candidates. Disabled
-     * rules are skipped before compilation, so a malformed disabled matcher
-     * never throws and never affects evaluation of enabled rules. The
-     * winning candidate is chosen by descending explicit [BlockingRule.priority]
-     * and then ascending matcher specificity (exact > contacts/specific >
-     * prefix/suffix/range/contains > regex). Equal-priority, equal-specificity
-     * candidates keep their declaration order. If no candidate matches, the
-     * result is a default allow with a null [MatchResult.ruleId].
+     * resolving [RuleMatcher.Contacts] against [contacts]. Equivalent to
+     * `compile(rules).evaluate(numberDigits, contacts)`; see [compile] for
+     * the precedence rule and [CompiledRuleSet.evaluate] for the result
+     * contract.
      *
      * @throws IllegalArgumentException if any enabled rule carries an invalid
      *   matcher value (empty, non-digit canonical value, or an invalid /
@@ -42,35 +40,71 @@ object RuleCompiler {
         numberDigits: String,
         rules: List<BlockingRule>,
         contacts: Set<String>,
-    ): MatchResult {
-        // Disabled rules are skipped BEFORE compilation so a malformed
-        // disabled matcher can never throw or break evaluation of a valid
-        // enabled rule. The original declaration index is preserved so equal
-        // priority/specificity candidates keep stable order.
-        val winner = rules
+    ): MatchResult = compile(rules).evaluate(numberDigits, contacts)
+
+    /**
+     * Validate and compile [rules] into an immutable [CompiledRuleSet].
+     *
+     * Disabled rules are skipped BEFORE compilation so a malformed disabled
+     * matcher can never throw or break compilation of a valid enabled rule.
+     * The original declaration index is preserved so equal priority/
+     * specificity candidates keep stable order. The returned set's
+     * [CompiledRuleSet.evaluate] chooses the winning candidate by descending
+     * explicit [BlockingRule.priority] and then ascending matcher specificity
+     * (exact > contacts/specific > prefix/suffix/range/contains > regex); if
+     * no candidate matches, the result is a default allow with a null
+     * [MatchResult.ruleId].
+     *
+     * @throws IllegalArgumentException if any enabled rule carries an invalid
+     *   matcher value (empty, non-digit canonical value, or an invalid /
+     *   over-long / nested-repetition regex).
+     */
+    fun compile(rules: List<BlockingRule>): CompiledRuleSet {
+        val candidates = rules
             .asSequence()
             .mapIndexed { index, rule -> index to rule }
             .filter { (_, rule) -> rule.enabled }
-            .map { (index, rule) -> Candidate(index, rule, compile(rule)) }
-            .filter { it.compiled.matches(numberDigits, contacts) }
-            .minWithOrNull(candidateComparator)
+            .map { (index, rule) -> Candidate(index, rule, compileMatcher(rule)) }
+            .toList()
+        return CompiledRuleSet(candidates)
+    }
 
-        return if (winner != null) {
-            MatchResult(
-                action = winner.rule.action,
-                ruleId = winner.rule.id,
-                explanation = explain(winner.rule, winner.compiled),
-            )
-        } else {
-            MatchResult(
-                action = RuleAction.ALLOW,
-                ruleId = null,
-                explanation = "No enabled rule matched; default allow.",
-            )
+    /**
+     * An immutable, fully compiled rule set. Every enabled rule's matcher
+     * has already been validated and compiled (regex parsed into a
+     * [java.util.regex.Pattern], range bounds parsed into [java.math.BigInteger]);
+     * [evaluate] performs no compilation and is safe to call repeatedly.
+     */
+    class CompiledRuleSet internal constructor(private val candidates: List<Candidate>) {
+
+        /**
+         * Evaluate [numberDigits] against the compiled candidates, resolving
+         * [RuleMatcher.Contacts] against [contacts]. See [RuleCompiler.compile]
+         * for the precedence rule.
+         */
+        fun evaluate(numberDigits: String, contacts: Set<String>): MatchResult {
+            val winner = candidates
+                .asSequence()
+                .filter { it.compiled.matches(numberDigits, contacts) }
+                .minWithOrNull(candidateComparator)
+
+            return if (winner != null) {
+                MatchResult(
+                    action = winner.rule.action,
+                    ruleId = winner.rule.id,
+                    explanation = explain(winner.rule, winner.compiled),
+                )
+            } else {
+                MatchResult(
+                    action = RuleAction.ALLOW,
+                    ruleId = null,
+                    explanation = "No enabled rule matched; default allow.",
+                )
+            }
         }
     }
 
-    private data class Candidate(
+    internal data class Candidate(
         val order: Int,
         val rule: BlockingRule,
         val compiled: CompiledMatcher,
@@ -81,7 +115,7 @@ object RuleCompiler {
             .thenBy { it.compiled.specificity }
             .thenBy { it.order }
 
-    private fun compile(rule: BlockingRule): CompiledMatcher =
+    private fun compileMatcher(rule: BlockingRule): CompiledMatcher =
         when (val matcher = rule.matcher) {
             is RuleMatcher.Exact -> {
                 requireDigits(matcher.value, rule)
@@ -234,12 +268,12 @@ object RuleCompiler {
         return "Rule '${rule.name}' (${rule.id}) ${rule.action.name.lowercase()} — ${compiled.specificity.label} match: $matcherPhrase."
     }
 
-    private data class CompiledMatcher(
+    internal data class CompiledMatcher(
         val specificity: Exactness,
         val matches: (number: String, contacts: Set<String>) -> Boolean,
     )
 
-    private enum class Exactness(val label: String) {
+    internal enum class Exactness(val label: String) {
         EXACT("exact"),
         CONTACT("contact"),
         PREFIX("prefix/suffix/range/contains"),

@@ -4,6 +4,11 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    // Applied without a version: kapt ships in the same Kotlin Gradle plugin
+    // artifact as kotlin-android (already resolved above), so pinning a
+    // separate version here makes Gradle treat it as a second, conflicting
+    // plugin request ("already on the classpath with an unknown version").
+    id("org.jetbrains.kotlin.kapt")
     alias(libs.plugins.spotless)
 }
 
@@ -68,6 +73,16 @@ dependencies {
 
     testImplementation(libs.junit)
     implementation(libs.libphonenumber)
+
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    kapt(libs.room.compiler)
+    implementation(libs.datastore.preferences)
+    implementation(libs.kotlinx.coroutines.core)
+}
+
+kapt {
+    correctErrorTypes = true
 }
 
 dependencyLocking {
