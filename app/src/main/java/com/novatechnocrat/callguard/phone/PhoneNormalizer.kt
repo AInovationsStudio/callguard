@@ -54,13 +54,17 @@ class PhoneNormalizer(
         val fallbackRegion = deviceRegion()?.takeIf { it.isNotBlank() }?.uppercase()
         val effectiveRegion: String? = explicitRegion ?: fallbackRegion
 
-        if (effectiveRegion != null && !util.supportedRegions.contains(effectiveRegion)) {
+        // International input is parsed without a region hint, so an
+        // unsupported/garbage explicit or device region must NOT reject a
+        // valid `+`-prefixed number. Only validate the region when it will
+        // actually be used as the default country for a national number.
+        val isInternational = raw.startsWith("+")
+        if (!isInternational && effectiveRegion != null && !util.supportedRegions.contains(effectiveRegion)) {
             return PhoneNormalizationResult.Invalid(
                 "unsupported region code '$effectiveRegion'",
             )
         }
 
-        val isInternational = raw.startsWith("+")
         if (isInternational || effectiveRegion != null) {
             // libphonenumber ignores the default region for `+`-prefixed input,
             // so passing null/empty is safe for international numbers; for

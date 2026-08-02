@@ -50,6 +50,27 @@ class PhoneNormalizerTest {
         )
     }
 
+    @Test
+    fun internationalNumberWithUnsupportedExplicitRegionIsStillValid() {
+        // Regression: a valid + number must not be rejected for an unsupported
+        // explicit region, because international input is parsed without a
+        // region hint.
+        val normalizer = PhoneNormalizer(deviceRegion = noDeviceRegion)
+        val result = normalizer.normalize(PhoneNumberInput(usE164, region = "ZZZ"))
+        assertTrue("expected Valid, got $result", result is PhoneNormalizationResult.Valid)
+        assertEquals(usDigits, (result as PhoneNormalizationResult.Valid).phone.digits)
+    }
+
+    @Test
+    fun internationalNumberWithUnsupportedDeviceRegionIsStillValid() {
+        // Regression: same as above but the unsupported region comes from the
+        // device-region adapter rather than the explicit input.
+        val normalizer = PhoneNormalizer(deviceRegion = { "ZZZ" })
+        val result = normalizer.normalize(PhoneNumberInput(usE164, region = null))
+        assertTrue("expected Valid, got $result", result is PhoneNormalizationResult.Valid)
+        assertEquals(usDigits, (result as PhoneNormalizationResult.Valid).phone.digits)
+    }
+
     // --- Valid national input with explicit region ---
 
     @Test
