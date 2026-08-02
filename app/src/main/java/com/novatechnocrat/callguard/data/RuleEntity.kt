@@ -67,8 +67,28 @@ class RuleEntityConverters {
     @TypeConverter
     fun toMatcherType(value: String): MatcherType = MatcherType.valueOf(value)
 
+    /**
+     * Joins [set] into a single [SPECIFIC_NUMBERS_DELIMITER]-separated column
+     * value. A comma is only a safe, collision-free delimiter because every
+     * element is required to be a non-empty canonical digit string — digits
+     * can never contain a comma, so a join can never be ambiguously re-split.
+     * [requireCanonicalDigits] enforces that here rather than assuming it: a
+     * value containing the delimiter (or any non-digit character) would
+     * otherwise round-trip as a *different* set of numbers than what was
+     * written, silently and without error.
+     *
+     * [BlockingRule.toEntity] validates this same invariant before it ever
+     * reaches this converter, but this is the actual Room/SQLite persistence
+     * boundary — a future caller that constructs a [RuleEntity] directly
+     * (bypassing [BlockingRule.toEntity]) would not go through that check, so
+     * it must fail loudly here too rather than silently corrupt the DB
+     * column.
+     */
     @TypeConverter
-    fun fromStringSet(set: Set<String>?): String? = set?.joinToString(SPECIFIC_NUMBERS_DELIMITER)
+    fun fromStringSet(set: Set<String>?): String? {
+        set?.forEach(::requireCanonicalDigits)
+        return set?.joinToString(SPECIFIC_NUMBERS_DELIMITER)
+    }
 
     @TypeConverter
     fun toStringSet(value: String?): Set<String>? =
@@ -76,6 +96,23 @@ class RuleEntityConverters {
 
     private companion object {
         const val SPECIFIC_NUMBERS_DELIMITER = ","
+    }
+}
+
+/**
+ * Enforces the canonical-digit invariant [RuleEntityConverters]'s
+ * comma-delimited [RuleEntity.specificNumbers] CSV encoding depends on: a
+ * comma (or any other non-digit character) inside a value would be
+ * indistinguishable, after encode then decode, from two separate numbers
+ * split at that comma — silent data corruption, not a crash. Shared by
+ * [RuleEntityConverters.fromStringSet] and [BlockingRule.toEntity] so both
+ * persistence boundaries a [RuleMatcher.SpecificNumbers] value crosses reject
+ * a bad value the same way.
+ */
+private fun requireCanonicalDigits(value: String) {
+    require(value.isNotEmpty() && value.all { it.isDigit() }) {
+        "SpecificNumbers value '$value' must be a non-empty canonical digit string " +
+            "(a non-digit character would corrupt the comma-delimited CSV round trip)"
     }
 }
 
@@ -109,6 +146,13 @@ fun BlockingRule.toEntity(position: Int): RuleEntity {
         }
         is RuleMatcher.Contacts -> MatcherType.CONTACTS
         is RuleMatcher.SpecificNumbers -> {
+            // RuleCompiler validates SpecificNumbers for ENABLED rules only —
+            // it skips disabled rules entirely — yet replaceRules persists
+            // disabled rules too, so a disabled rule's bad value must be
+            // caught here, at the mapping boundary, instead of silently
+            // corrupting on its next comma-delimited CSV encode (see
+            // requireCanonicalDigits).
+            m.numbers.forEach(::requireCanonicalDigits)
             specificNumbers = m.numbers
             MatcherType.SPECIFIC_NUMBERS
         }

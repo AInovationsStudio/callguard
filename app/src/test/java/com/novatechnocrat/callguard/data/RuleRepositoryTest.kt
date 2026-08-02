@@ -3,9 +3,14 @@ package studio.ainovations.callguard.data
 import studio.ainovations.callguard.domain.BlockingRule
 import studio.ainovations.callguard.domain.RuleAction
 import studio.ainovations.callguard.domain.RuleMatcher
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -29,15 +34,27 @@ import org.junit.Test
  */
 class RuleRepositoryTest {
 
-    /** An in-memory stand-in for a Room-backed [RuleDao]. */
+    /**
+     * An in-memory stand-in for a Room-backed [RuleDao]. [beforeGetAllOnce]
+     * and [beforeInsertAll] are test-only hooks (no-ops by default) that let
+     * a test suspend a read or write mid-flight to deterministically control
+     * interleaving with a concurrent [RuleRepository] call — see the
+     * `refreshFromDisk`/`replaceRules` race tests below.
+     */
     private class FakeRuleDao : RuleDao {
         private val state = MutableStateFlow<List<RuleEntity>>(emptyList())
+        var beforeGetAllOnce: suspend () -> Unit = {}
+        var beforeInsertAll: suspend () -> Unit = {}
 
         override fun observeAll() = state
 
-        override suspend fun getAllOnce(): List<RuleEntity> = state.value
+        override suspend fun getAllOnce(): List<RuleEntity> {
+            beforeGetAllOnce()
+            return state.value
+        }
 
         override suspend fun insertAll(entities: List<RuleEntity>) {
+            beforeInsertAll()
             state.value = state.value + entities
         }
 
@@ -251,6 +268,111 @@ class RuleRepositoryTest {
         val result = secondProcess.compileSnapshot().evaluate("15718881234", emptySet())
         assertEquals(RuleAction.BLOCK, result.action)
         assertEquals("r1", result.ruleId)
+    }
+
+    /**
+     * Regression test for the persistence layer review's Important finding:
+     * [RuleRepository.refreshFromDisk] and [RuleRepository.replaceRules] both
+     * read-or-write disk then publish to the same snapshot reference, so
+     * without a concurrency guard a [refreshFromDisk] started before a
+     * concurrent edit could still publish *after* it — overwriting the
+     * newer, already-persisted edit with the stale rule set the refresh had
+     * read earlier. This uses [FakeRuleDao.beforeGetAllOnce] as a controlled
+     * gate to freeze `refreshFromDisk` mid-read (still holding the
+     * repository's write lock) and deterministically prove: (1) the
+     * concurrent edit cannot even reach the database while the refresh is in
+     * flight — the two are mutually exclusive, not just eventually
+     * consistent — and (2) once both complete, the published snapshot is the
+     * edit's, never the stale one the frozen refresh started with.
+     */
+    @Test
+    fun refreshFromDiskCannotPublishStaleStateOverAConcurrentEdit() = runBlocking {
+        val dao = FakeRuleDao()
+        dao.insertAll(listOf(rule("old", RuleAction.BLOCK, RuleMatcher.Exact("15718881234")).toEntity(position = 0)))
+        val repo = RuleRepository(dao)
+
+        val refreshIsReadingDisk = CompletableDeferred<Unit>()
+        val releaseRefreshRead = CompletableDeferred<Unit>()
+        dao.beforeGetAllOnce = {
+            refreshIsReadingDisk.complete(Unit)
+            releaseRefreshRead.await()
+        }
+
+        // A restart-recovery refresh starts first and is frozen mid-read,
+        // still holding the repository's write lock.
+        val refreshJob = launch(Dispatchers.Default) { repo.refreshFromDisk() }
+        refreshIsReadingDisk.await()
+
+        // A newer user edit races it. It must not be able to reach the
+        // database while the refresh is in flight and holding the lock.
+        val editReachedDatabase = CompletableDeferred<Unit>()
+        dao.beforeInsertAll = { editReachedDatabase.complete(Unit) }
+        val editJob = launch(Dispatchers.Default) {
+            repo.replaceRules(listOf(rule("new", RuleAction.ALLOW, RuleMatcher.Exact("15718881234"))))
+        }
+        val editRanEarly = withTimeoutOrNull(300) { editReachedDatabase.await() }
+        assertNull(
+            "replaceRules must not proceed while refreshFromDisk holds the repository's write lock",
+            editRanEarly,
+        )
+
+        // Release the frozen refresh; only then can the edit proceed.
+        releaseRefreshRead.complete(Unit)
+        refreshJob.join()
+        withTimeout(2_000) { editReachedDatabase.await() }
+        editJob.join()
+
+        // The atomic snapshot contract holds: the edit's snapshot is
+        // published, never the stale disk read the refresh started with.
+        val result = repo.compileSnapshot().evaluate("15718881234", emptySet())
+        assertEquals(RuleAction.ALLOW, result.action)
+        assertEquals("new", result.ruleId)
+    }
+
+    /** Mirror of the above for the opposite ordering: an edit in flight must
+     * block a concurrent refresh, so the refresh never observes a
+     * half-applied (mid-transaction) rule set and always reads the edit's
+     * fully committed result.
+     */
+    @Test
+    fun replaceRulesBlocksAConcurrentRefreshUntilItCompletes() = runBlocking {
+        val dao = FakeRuleDao()
+        val repo = RuleRepository(dao)
+
+        val editIsWritingDisk = CompletableDeferred<Unit>()
+        val releaseEditWrite = CompletableDeferred<Unit>()
+        dao.beforeInsertAll = {
+            editIsWritingDisk.complete(Unit)
+            releaseEditWrite.await()
+        }
+
+        // An edit starts first and is frozen mid-write, holding the lock.
+        val editJob = launch(Dispatchers.Default) {
+            repo.replaceRules(listOf(rule("new", RuleAction.ALLOW, RuleMatcher.Exact("15718881234"))))
+        }
+        editIsWritingDisk.await()
+
+        // A concurrent restart-recovery refresh must wait rather than
+        // reading a half-applied rule set.
+        val refreshReadDisk = CompletableDeferred<Unit>()
+        dao.beforeGetAllOnce = { refreshReadDisk.complete(Unit) }
+        val refreshJob = launch(Dispatchers.Default) { repo.refreshFromDisk() }
+        val refreshRanEarly = withTimeoutOrNull(300) { refreshReadDisk.await() }
+        assertNull(
+            "refreshFromDisk must not read the database while replaceRules holds the repository's write lock",
+            refreshRanEarly,
+        )
+
+        releaseEditWrite.complete(Unit)
+        editJob.join()
+        withTimeout(2_000) { refreshReadDisk.await() }
+        refreshJob.join()
+
+        // Refresh reads the edit's already-committed rule, never a stale or
+        // half-applied read.
+        val result = repo.compileSnapshot().evaluate("15718881234", emptySet())
+        assertEquals(RuleAction.ALLOW, result.action)
+        assertEquals("new", result.ruleId)
     }
 
     @Test
