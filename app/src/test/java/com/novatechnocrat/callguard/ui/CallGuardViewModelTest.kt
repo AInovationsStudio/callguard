@@ -11,6 +11,7 @@ import studio.ainovations.callguard.domain.BlockingRule
 import studio.ainovations.callguard.domain.RuleAction
 import studio.ainovations.callguard.domain.RuleMatcher
 import studio.ainovations.callguard.phone.PhoneNormalizer
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -19,8 +20,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class CallGuardViewModelTest {
@@ -34,22 +37,44 @@ class CallGuardViewModelTest {
             rule("two", "1800555"),
         )
         repository.replaceRules(initialRules)
-        val dispatcher = Dispatchers.Default.limitedParallelism(1)
+        val firstStateRead = CompletableDeferred<Unit>()
+        val releaseFirstStateRead = CompletableDeferred<Unit>()
+        val secondStateRead = CompletableDeferred<Unit>()
+        var isFirstStateRead = true
         val viewModel = CallGuardViewModel(
             ruleRepository = repository,
             preferencesRepository = PreferencesRepository(FakeDataStore()),
             normalizer = PhoneNormalizer(deviceRegion = { "US" }),
-            scope = CoroutineScope(dispatcher),
+            scope = CoroutineScope(Dispatchers.Default.limitedParallelism(2)),
+            afterMutationStateRead = {
+                if (isFirstStateRead) {
+                    isFirstStateRead = false
+                    firstStateRead.complete(Unit)
+                    releaseFirstStateRead.await()
+                } else {
+                    secondStateRead.complete(Unit)
+                }
+            },
         )
 
         withTimeout(3_000) {
             while (viewModel.uiState.value.rules.size != 2) delay(10)
         }
         viewModel.onRuleToggled("one", enabled = false)
+        firstStateRead.await()
         viewModel.onRuleToggled("two", enabled = false)
 
+        assertNull(
+            "second mutation must not read state while first mutation is suspended",
+            withTimeoutOrNull(250) { secondStateRead.await() },
+        )
+        releaseFirstStateRead.complete(Unit)
         withTimeout(3_000) {
-            while (dao.rules().any { it.enabled }) delay(10)
+            while (dao.rules().map { it.id } != listOf("one", "two") ||
+                dao.rules().any { it.enabled }
+            ) {
+                delay(10)
+            }
         }
         assertEquals(listOf("one", "two"), dao.rules().map { it.id })
         assertFalse(dao.rules().any { it.enabled })

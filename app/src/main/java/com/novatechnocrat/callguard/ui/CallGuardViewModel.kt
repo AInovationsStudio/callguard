@@ -173,6 +173,7 @@ class CallGuardViewModel(
     private val contactsPermissionGranted: () -> Boolean = { false },
     private val screeningRoleStatus: () -> ScreeningRoleStatus = { ScreeningRoleStatus.Unsupported },
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+    private val afterMutationStateRead: suspend () -> Unit = {},
 ) : ViewModel() {
 
     private val mutationMutex = Mutex()
@@ -349,6 +350,7 @@ class CallGuardViewModel(
                 } else {
                     state.rules + newRule
                 }
+                afterMutationStateRead()
                 ruleRepository.replaceRules(updatedRules)
                 _uiState.update { current ->
                     current.copy(
@@ -366,6 +368,7 @@ class CallGuardViewModel(
         scope.launch {
             mutationMutex.withLock {
                 val updated = _uiState.value.rules.map { if (it.id == ruleId) it.copy(enabled = enabled) else it }
+                afterMutationStateRead()
                 ruleRepository.replaceRules(updated)
                 publishRules(updated)
             }
@@ -376,6 +379,7 @@ class CallGuardViewModel(
         scope.launch {
             mutationMutex.withLock {
                 val updated = _uiState.value.rules.filterNot { it.id == ruleId }
+                afterMutationStateRead()
                 ruleRepository.replaceRules(updated)
                 publishRules(updated)
             }
