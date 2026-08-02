@@ -1,7 +1,11 @@
 package studio.ainovations.callguard.ui
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -28,17 +32,38 @@ class RuleWizardTest {
         var saveCount = 0
 
         composeRule.setContent {
+            var state by remember {
+                mutableStateOf(
+                    WizardState(
+                        canSave = true,
+                        positiveExample = WizardExample("15718884444"),
+                        negativeExample = WizardExample("25718884444"),
+                    ),
+                )
+            }
             RuleWizardScreen(
-                state = WizardState(
-                    canSave = true,
-                    positiveExample = WizardExample("15718884444"),
-                    negativeExample = WizardExample("25718884444"),
-                ),
+                state = state,
                 availableRegions = listOf("US"),
-                onInputChanged = { field, value -> inputEvents += field to value },
-                onMatcherSelected = { selectedMatcher = it },
-                onActionSelected = { selectedAction = it },
-                onPreviewTested = { testedInputs += it },
+                onInputChanged = { field, value ->
+                    inputEvents += field to value
+                    state = when (field) {
+                        WizardField.RAW_VALUE -> state.copy(rawValue = value)
+                        WizardField.PREVIEW_INPUT -> state.copy(previewInput = value)
+                        else -> state
+                    }
+                },
+                onMatcherSelected = {
+                    selectedMatcher = it
+                    state = state.copy(matcherType = it)
+                },
+                onActionSelected = {
+                    selectedAction = it
+                    state = state.copy(action = it)
+                },
+                onPreviewTested = {
+                    testedInputs += it
+                    state = state.copy(previewInput = it)
+                },
                 onSave = { saveCount += 1 },
                 onCancel = {},
             )
@@ -64,8 +89,14 @@ class RuleWizardTest {
         assert(inputEvents.any { it == WizardField.RAW_VALUE to "1571888" })
         assert(testedInputs == listOf("15718881234", "25718881234"))
         assert(saveCount == 1)
-        composeRule.onNodeWithTag(CallGuardTestTags.WIZARD_POSITIVE_EXAMPLE).assertTextContains("Will match")
-        composeRule.onNodeWithTag(CallGuardTestTags.WIZARD_NEGATIVE_EXAMPLE).assertTextContains("Will NOT match")
+        composeRule.onNodeWithTag(
+            CallGuardTestTags.WIZARD_POSITIVE_EXAMPLE,
+            useUnmergedTree = true,
+        ).assertTextEquals("Will match, e.g. 15718884444")
+        composeRule.onNodeWithTag(
+            CallGuardTestTags.WIZARD_NEGATIVE_EXAMPLE,
+            useUnmergedTree = true,
+        ).assertTextEquals("Will NOT match, e.g. 25718884444")
     }
 
     @Test
@@ -110,11 +141,14 @@ class RuleWizardTest {
             )
         }
 
-        composeRule.onNodeWithTag(CallGuardTestTags.PREVIEW_RESULT_ACTION)
-            .assertTextContains("BLOCK")
-        composeRule.onNodeWithTag(CallGuardTestTags.PREVIEW_RESULT_RULE_ID)
-            .assertTextContains("rule-1")
-        composeRule.onNodeWithTag(CallGuardTestTags.PREVIEW_RESULT_EXPLANATION)
-            .assertTextContains("blocked")
+        composeRule.onNodeWithTag(CallGuardTestTags.PREVIEW_RESULT_ACTION, useUnmergedTree = true)
+            .assertTextEquals("Result: BLOCK")
+        composeRule.onNodeWithTag(CallGuardTestTags.PREVIEW_RESULT_RULE_ID, useUnmergedTree = true)
+            .assertTextEquals("Matched rule: rule-1")
+        composeRule.onNodeWithTag(
+            CallGuardTestTags.PREVIEW_RESULT_EXPLANATION,
+            useUnmergedTree = true,
+        )
+            .assertTextEquals("Starts with 1571888, so this call will be blocked.")
     }
 }

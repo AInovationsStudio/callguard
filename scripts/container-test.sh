@@ -1,12 +1,9 @@
 #!/usr/bin/env bash
 # Run the CallGuard deterministic local gate inside the reproducible container:
 # formatting check, Android lint, unit tests, and the manifest permission audit.
-# Pass --instrumentation to additionally run Compose/service instrumentation
-# tests (connectedDebugAndroidTest) against a connected device or emulator.
-# Per the implementation plan's Final verification step, instrumentation tests
-# run "on an API 26 emulator and a current API emulator when available" — this
-# container ships no emulator, so --instrumentation reports that absence
-# clearly and exits 0 rather than failing the deterministic gate.
+# Pass --instrumentation to boot the pinned API-34 AVD in the container and run
+# Compose/service instrumentation tests against it. A missing or unbootable AVD
+# is a hard failure; UI verification must never silently skip.
 set -euo pipefail
 
 RUN_INSTRUMENTATION=0
@@ -20,7 +17,7 @@ done
 cd "$(dirname "$0")/.."
 ROOT="$PWD"
 
-IMAGE_TAG="callguard-android:dev"
+IMAGE_TAG="callguard-android:api34-emu-v2"
 GRADLE_VOLUME="callguard-gradle-cache"
 
 ENGINE="${CONTAINER_ENGINE:-}"
@@ -34,10 +31,12 @@ case "$ENGINE" in
     podman)
         USERNS_ARGS=(--userns=keep-id)
         GRADLE_VOL="${GRADLE_VOLUME}:/home/developer/.gradle:U,Z"
+        DEVICE_ARGS=(--device /dev/kvm --group-add keep-groups)
         ;;
     docker)
         USERNS_ARGS=()
         GRADLE_VOL="${GRADLE_VOLUME}:/home/developer/.gradle:Z"
+        DEVICE_ARGS=(--device /dev/kvm)
         echo "[container-test] note: docker is best-effort; podman is the tested engine." >&2
         ;;
     *)
@@ -59,14 +58,14 @@ run_gradle() {
         -e ANDROID_SDK_ROOT=/android-sdk \
         -w /workspace \
         "${USERNS_ARGS[@]}" \
+        "${DEVICE_ARGS[@]}" \
         --user developer \
         "$IMAGE_TAG" \
         ./gradlew --no-daemon --dependency-verification strict "$@"
 }
 
-# Runs a command inside the same container/user/mounts as run_gradle, without
-# the gradlew entrypoint — used to probe `adb devices` before deciding whether
-# connectedDebugAndroidTest has anything to run against.
+# Runs a command inside the same container/user/mounts as run_gradle, with KVM
+# available for the pinned emulator.
 run_in_container() {
     "$ENGINE" run --rm \
         -v "$ROOT:/workspace:Z" \
@@ -75,6 +74,7 @@ run_in_container() {
         -e ANDROID_SDK_ROOT=/android-sdk \
         -w /workspace \
         "${USERNS_ARGS[@]}" \
+        "${DEVICE_ARGS[@]}" \
         --user developer \
         "$IMAGE_TAG" \
         "$@"
@@ -93,15 +93,51 @@ echo "[container-test] manifest audit..."
 bash scripts/manifest-audit.sh
 
 if [[ "$RUN_INSTRUMENTATION" -eq 1 ]]; then
-    echo "[container-test] checking for a connected device/emulator..."
-    DEVICE_COUNT="$(run_in_container bash -c 'adb start-server >/dev/null 2>&1; adb devices | tail -n +2 | grep -c device$' || true)"
-    if [[ "${DEVICE_COUNT:-0}" -eq 0 ]]; then
-        echo "[container-test] no device/emulator attached to this container: skipping instrumentation tests." >&2
-        echo "[container-test] this image ships no emulator; run against a real device/emulator to exercise RuleWizardTest." >&2
-    else
-        echo "[container-test] instrumentation tests (connectedDebugAndroidTest)..."
-        run_gradle connectedDebugAndroidTest
-    fi
+    echo "[container-test] booting pinned API-34 emulator..."
+    run_in_container bash -lc '
+        set -euo pipefail
+        AVD_NAME="callguard-api34"
+        EMULATOR_LOG="/tmp/callguard-emulator.log"
+        emulator -avd "$AVD_NAME" \
+            -no-window \
+            -no-audio \
+            -no-boot-anim \
+            -no-snapshot \
+            -accel on \
+            -no-metrics \
+            -gpu swiftshader_indirect \
+            >"$EMULATOR_LOG" 2>&1 &
+        EMULATOR_PID=$!
+        finish() {
+            kill "$EMULATOR_PID" >/dev/null 2>&1 || true
+            wait "$EMULATOR_PID" >/dev/null 2>&1 || true
+        }
+        trap finish EXIT
+        adb start-server >/dev/null
+        for _ in $(seq 1 180); do
+            if adb get-state >/dev/null 2>&1; then
+                break
+            fi
+            sleep 1
+        done
+        adb get-state >/dev/null 2>&1 || {
+            echo "emulator did not become visible to adb; log follows:" >&2
+            cat "$EMULATOR_LOG" >&2
+            exit 1
+        }
+        for _ in $(seq 1 180); do
+            if [[ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" == "1" ]]; then
+                break
+            fi
+            sleep 1
+        done
+        [[ "$(adb shell getprop sys.boot_completed | tr -d "\r")" == "1" ]] || {
+            echo "emulator failed to boot; log follows:" >&2
+            cat "$EMULATOR_LOG" >&2
+            exit 1
+        }
+        ./gradlew --no-daemon --dependency-verification strict connectedDebugAndroidTest
+    '
 fi
 
 echo "[container-test] OK: formatting, lint, unit tests, manifest audit all passed."

@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$PWD"
 
-IMAGE_TAG="callguard-android:dev"
+IMAGE_TAG="callguard-android:api34-emu-v2"
 GRADLE_VOLUME="callguard-gradle-cache"
 
 ENGINE="${CONTAINER_ENGINE:-}"

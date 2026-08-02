@@ -11,6 +11,8 @@ ARG ANDROID_SDK_ROOT=/android-sdk
 ARG ANDROID_CMDLINE_TOOLS_VERSION=11076708
 ARG ANDROID_PLATFORM=android-34
 ARG ANDROID_BUILD_TOOLS=34.0.0
+ARG ANDROID_SYSTEM_IMAGE=system-images;android-34;google_apis;x86_64
+ARG ANDROID_AVD_NAME=callguard-api34
 
 # Published integrity for commandlinetools-linux-11076708_latest.zip, as listed in
 # Google's dl.google.com/android/repository/repository2-3.xml (sha-1 + size).
@@ -20,13 +22,27 @@ ARG ANDROID_CMDLINE_TOOLS_SIZE=153607504
 
 ENV ANDROID_HOME=${ANDROID_SDK_ROOT} \
     ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT} \
-    PATH="${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin:${ANDROID_SDK_ROOT}/platform-tools:${PATH}"
+    PATH="${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin:${ANDROID_SDK_ROOT}/emulator:${ANDROID_SDK_ROOT}/platform-tools:${PATH}"
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
+        libdbus-1-3 \
+        libfontconfig1 \
+        libglib2.0-0 \
+        libnss3 \
+        libpulse0 \
+        procps \
         unzip \
         wget \
+        libx11-6 \
+        libxcb1 \
+        libxcomposite1 \
+        libxdamage1 \
+        libxi6 \
+        libxkbcommon0 \
+        libxrandr2 \
+        libxtst6 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --system --gid 1000 developer \
@@ -55,6 +71,16 @@ RUN yes | sdkmanager --licenses > /dev/null 2>&1 || true \
         "platform-tools" \
         "platforms;${ANDROID_PLATFORM}" \
         "build-tools;${ANDROID_BUILD_TOOLS}" \
+        "emulator" \
+        "${ANDROID_SYSTEM_IMAGE}" \
     && sdkmanager --version
+
+RUN mkdir -p /home/developer/.android/avd \
+    && echo "no" | avdmanager create avd \
+        --force \
+        --name "${ANDROID_AVD_NAME}" \
+        --package "${ANDROID_SYSTEM_IMAGE}" \
+        --device "pixel_2" \
+    && chown -R developer:developer /home/developer/.android
 
 WORKDIR /workspace
