@@ -9,6 +9,12 @@ import java.math.BigInteger
  * engine and the domain types. Validation rejects malformed matchers before
  * evaluation so a caller that compiles at save time can never observe a
  * partially applied rule set at call time.
+ *
+ * Note: `evaluate` recompiles every enabled rule on each call, which is fine
+ * for the rule compiler unit-test surface but wasteful on the screening hot path.
+ * persistence layer's `RuleSnapshot` is expected to compile (and cache the compiled
+ * [java.util.regex.Pattern] and `Range` bounds) once per atomic snapshot
+ * publication and reuse the cached form across evaluations.
  */
 object RuleCompiler {
 
@@ -19,7 +25,9 @@ object RuleCompiler {
      * Evaluate [numberDigits] (canonical digit-only form) against [rules],
      * resolving [RuleMatcher.Contacts] against [contacts].
      *
-     * Enabled rules whose matcher accepts the number are candidates. The
+     * Enabled rules whose matcher accepts the number are candidates. Disabled
+     * rules are skipped before compilation, so a malformed disabled matcher
+     * never throws and never affects evaluation of enabled rules. The
      * winning candidate is chosen by descending explicit [BlockingRule.priority]
      * and then ascending matcher specificity (exact > contacts/specific >
      * prefix/suffix/range/contains > regex). Equal-priority, equal-specificity
@@ -35,11 +43,16 @@ object RuleCompiler {
         rules: List<BlockingRule>,
         contacts: Set<String>,
     ): MatchResult {
-        val compiled = rules.map { it to compile(it) }
-        val winner = compiled
+        // Disabled rules are skipped BEFORE compilation so a malformed
+        // disabled matcher can never throw or break evaluation of a valid
+        // enabled rule. The original declaration index is preserved so equal
+        // priority/specificity candidates keep stable order.
+        val winner = rules
             .asSequence()
-            .mapIndexed { index, entry -> Candidate(index, entry.first, entry.second) }
-            .filter { it.rule.enabled && it.compiled.matches(numberDigits, contacts) }
+            .mapIndexed { index, rule -> index to rule }
+            .filter { (_, rule) -> rule.enabled }
+            .map { (index, rule) -> Candidate(index, rule, compile(rule)) }
+            .filter { it.compiled.matches(numberDigits, contacts) }
             .minWithOrNull(candidateComparator)
 
         return if (winner != null) {
@@ -143,9 +156,12 @@ object RuleCompiler {
 
     /**
      * Detect a quantifier applied to a group that itself contains a quantifier
-     * (e.g. `(\d+)+`, `(a*)*`, `(a{2,3})+`) — the classic catastrophic-
-     * backtracking shape. Possessive/reluctant modifiers (`a++`, `a*?`) and
-     * dangling quantifiers are left to [java.util.regex.Pattern] to reject.
+     * (e.g. `(\d+)+`, `(a*)*`, `(a{2,3})+`, `((\d+))+`) — the classic
+     * catastrophic-backtracking shape. Redundant outer grouping does not
+     * bypass the check: a quantifier inside a nested group propagates up to
+     * the parent, so a quantifier on the outer group is still flagged.
+     * Possessive/reluctant modifiers (`a++`, `a*?`) and dangling quantifiers
+     * are left to [java.util.regex.Pattern] to reject.
      */
     private fun hasNestedRepetition(pattern: String): Boolean {
         val groupHasQuantifier = ArrayDeque<Boolean>()
@@ -169,6 +185,13 @@ object RuleCompiler {
                 ')' -> {
                     val had = groupHasQuantifier.removeLastOrNull() ?: false
                     i += 1
+                    // A nested quantified group makes its parent contain a
+                    // quantified subexpression, so the parent must be marked
+                    // too — otherwise redundant grouping like `((\d+))+` would
+                    // hide the inner quantifier from the outer-group check.
+                    if (had && groupHasQuantifier.isNotEmpty()) {
+                        groupHasQuantifier[groupHasQuantifier.lastIndex] = true
+                    }
                     if (had && i < pattern.length && isQuantifierStart(pattern[i])) return true
                 }
                 '[' -> {
