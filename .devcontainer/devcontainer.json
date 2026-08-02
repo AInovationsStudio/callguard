@@ -1,0 +1,20 @@
+{
+  "name": "CallGuard Android",
+  "build": {
+    "dockerfile": "Containerfile"
+  },
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+  "workspaceFolder": "/workspace",
+  "remoteEnv": {
+    "ANDROID_HOME": "/android-sdk",
+    "ANDROID_SDK_ROOT": "/android-sdk"
+  },
+  "containerEnv": {
+    "ANDROID_HOME": "/android-sdk",
+    "ANDROID_SDK_ROOT": "/android-sdk"
+  },
+  "mounts": [
+    "source=callguard-gradle-cache,target=/home/developer/.gradle,type=volume"
+  ],
+  "remoteUser": "developer"
+}
