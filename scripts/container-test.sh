@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run the CallGuard deterministic local gate inside the reproducible container:
+# Run the CallGuard deterministic local gate inside the pinned container:
 # formatting check, Android lint, unit tests, and the manifest permission audit.
 # Pass --instrumentation to boot the pinned API-34 AVD in the container and run
 # Compose/service instrumentation tests against it. A missing or unbootable AVD

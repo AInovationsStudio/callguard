@@ -21,10 +21,18 @@ class ScreeningDecisionResolver(
         region: String?,
         preferences: CallGuardPreferences,
         contacts: Set<String>,
+        contactsAvailable: Boolean = true,
     ): MatchResult {
         val effectiveRegion = region ?: preferences.defaultRegion
         if (rawNumber.isNullOrBlank()) {
             return fallback(preferences)
+        }
+        if (snapshot.hasContactRules && preferences.contactMatchingEnabled && !contactsAvailable) {
+            return MatchResult(
+                action = preferences.unknownNumberAction,
+                ruleId = null,
+                explanation = "Contact matching is unavailable; the configured fallback action was applied.",
+            )
         }
 
         return when (

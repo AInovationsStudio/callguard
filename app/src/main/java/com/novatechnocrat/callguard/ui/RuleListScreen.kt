@@ -1,12 +1,16 @@
 package studio.ainovations.callguard.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -17,6 +21,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -37,8 +45,12 @@ fun RuleListScreen(
     onDeleteRule: (String) -> Unit,
     onToggleRule: (String, Boolean) -> Unit,
     onOpenSettings: () -> Unit,
+    screeningRoleStatus: ScreeningRoleStatus = ScreeningRoleStatus.Unsupported,
+    contactsPermissionGranted: Boolean = false,
+    onRequestScreeningRole: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    var pendingDeleteId by remember { mutableStateOf<String?>(null) }
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -59,27 +71,90 @@ fun RuleListScreen(
                 onClick = onAddRule,
                 modifier = Modifier.testTag(CallGuardTestTags.ADD_RULE_BUTTON),
             ) {
-                Text("+")
+                AddSymbol()
             }
         },
     ) { padding ->
-        if (items.isEmpty()) {
-            Column(modifier = Modifier.padding(padding).padding(24.dp)) {
-                Text("No rules yet. Tap + to block or allow your first number or pattern.")
+        LazyColumn(modifier = Modifier.padding(padding)) {
+            if (screeningRoleStatus != ScreeningRoleStatus.Active) {
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp)
+                            .testTag(CallGuardTestTags.RULE_LIST_SCREENING_STATUS),
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = when (screeningRoleStatus) {
+                                    ScreeningRoleStatus.NotActive ->
+                                        "CallGuard is ready, but it is not protecting calls yet."
+                                    ScreeningRoleStatus.Unsupported ->
+                                        "Call screening is not available on this device."
+                                    ScreeningRoleStatus.Active -> ""
+                                },
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            if (screeningRoleStatus == ScreeningRoleStatus.NotActive) {
+                                Text("Set CallGuard as your screening app before relying on these rules.")
+                                Button(onClick = onRequestScreeningRole) {
+                                    Text("Activate CallGuard")
+                                }
+                            }
+                        }
+                    }
+                }
             }
-        } else {
-            LazyColumn(modifier = Modifier.padding(padding)) {
+            if (items.isEmpty()) {
+                item {
+                    Text(
+                        "No rules yet. Add a number or pattern to decide which calls should be blocked, silenced, or allowed.",
+                        modifier = Modifier.padding(24.dp),
+                    )
+                }
+            } else {
                 items(items, key = { it.id }) { item ->
-                    RuleRow(item, onEditRule, onDeleteRule, onToggleRule)
+                    RuleRow(
+                        item = item,
+                        contactsPermissionGranted = contactsPermissionGranted,
+                        onEditRule = onEditRule,
+                        onDeleteRule = { pendingDeleteId = it },
+                        onToggleRule = onToggleRule,
+                    )
                 }
             }
         }
+    }
+    pendingDeleteId?.let { id ->
+        val item = items.firstOrNull { it.id == id }
+        AlertDialog(
+            onDismissRequest = { pendingDeleteId = null },
+            title = { Text("Delete rule?") },
+            text = { Text("This will remove ${item?.name ?: "this rule"} and stop applying it.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDeleteRule(id)
+                        pendingDeleteId = null
+                    },
+                    modifier = Modifier.testTag(CallGuardTestTags.RULE_DELETE_CONFIRM_BUTTON),
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteId = null }) {
+                    Text("Cancel")
+                }
+            },
+        )
     }
 }
 
 @Composable
 private fun RuleRow(
     item: RuleListItem,
+    contactsPermissionGranted: Boolean,
     onEditRule: (String) -> Unit,
     onDeleteRule: (String) -> Unit,
     onToggleRule: (String, Boolean) -> Unit,
@@ -97,7 +172,16 @@ private fun RuleRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = "${item.actionLabel} — ${item.name}", style = MaterialTheme.typography.titleSmall)
                 Text(text = item.matcherDescription, style = MaterialTheme.typography.bodySmall)
-                Text(text = "Priority ${item.priority}", style = MaterialTheme.typography.labelSmall)
+                if (item.priority != 0) {
+                    Text(text = "Priority ${item.priority}", style = MaterialTheme.typography.labelSmall)
+                }
+                if (item.requiresContactsPermission && !contactsPermissionGranted) {
+                    Text(
+                        text = "Needs contacts access",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
             }
             Switch(
                 checked = item.enabled,
@@ -117,5 +201,14 @@ private fun RuleRow(
                 Text("Delete")
             }
         }
+    }
+}
+
+@Composable
+private fun AddSymbol() {
+    val color = MaterialTheme.colorScheme.onPrimary
+    Canvas(modifier = Modifier.size(24.dp)) {
+        drawLine(color, start = androidx.compose.ui.geometry.Offset(size.width / 2f, 4f), end = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height - 4f), strokeWidth = 2.dp.toPx())
+        drawLine(color, start = androidx.compose.ui.geometry.Offset(4f, size.height / 2f), end = androidx.compose.ui.geometry.Offset(size.width - 4f, size.height / 2f), strokeWidth = 2.dp.toPx())
     }
 }

@@ -57,6 +57,7 @@ enum class WizardField {
     RANGE_END,
     SPECIFIC_NUMBERS,
     COUNTRY,
+    PRIORITY,
     PREVIEW_INPUT,
 }
 
@@ -113,6 +114,7 @@ data class WizardState(
     val previewInput: String = "",
     val previewResult: MatchResult? = null,
     val previewError: String? = null,
+    val previewNotice: String? = null,
     val previewStale: Boolean = false,
     val canSave: Boolean = false,
 )
@@ -125,6 +127,7 @@ data class RuleListItem(
     val matcherDescription: String,
     val enabled: Boolean,
     val priority: Int,
+    val requiresContactsPermission: Boolean,
 )
 
 /** All state for [SettingsScreen]. */
@@ -220,18 +223,21 @@ class CallGuardViewModel(
                     unknownNumberAction = preferences.unknownNumberAction,
                     contactMatchingEnabled = preferences.contactMatchingEnabled,
                 ),
+                wizard = recomputeWizard(state.wizard, state.rules),
             )
         }
     }
 
     /** Re-reads the injected permission/role callbacks. Called on init and whenever Settings opens. */
     fun refreshPermissionState() {
+        val contactsGranted = contactsPermissionGranted()
         _uiState.update { state ->
             state.copy(
                 settings = state.settings.copy(
-                    contactsPermissionGranted = contactsPermissionGranted(),
+                    contactsPermissionGranted = contactsGranted,
                     screeningRoleStatus = screeningRoleStatus(),
                 ),
+                wizard = recomputeWizard(state.wizard, state.rules, contactsGranted),
             )
         }
     }
@@ -269,6 +275,7 @@ class CallGuardViewModel(
                 WizardField.RANGE_END -> wizard.copy(rangeEnd = value)
                 WizardField.SPECIFIC_NUMBERS -> wizard.copy(specificNumbersRaw = value)
                 WizardField.COUNTRY -> wizard.copy(country = value.ifBlank { null })
+                WizardField.PRIORITY -> value.toIntOrNull()?.let { wizard.copy(priority = it) } ?: wizard
                 WizardField.PREVIEW_INPUT -> wizard.copy(previewInput = value)
             }
         }
@@ -298,7 +305,21 @@ class CallGuardViewModel(
         val effectiveRules = state.rules.filterNot { it.id == wizard.editingRuleId } + listOfNotNull(candidate)
 
         val updated = if (rawNumber.isBlank()) {
-            wizard.copy(previewInput = rawNumber, previewResult = null, previewError = "Enter a number to test.")
+            wizard.copy(
+                previewInput = rawNumber,
+                previewResult = null,
+                previewError = "Enter a number to test.",
+                previewNotice = null,
+            )
+        } else if (candidate?.matcher is RuleMatcher.Contacts) {
+            wizard.copy(
+                previewInput = rawNumber,
+                previewResult = null,
+                previewError = null,
+                previewNotice = "Contacts are not simulated here. Grant contacts access and " +
+                    "verify this rule with a real call.",
+                previewStale = false,
+            )
         } else {
             runCatching {
                 when (val normalized = normalizer.normalize(PhoneNumberInput(rawNumber, wizard.country))) {
@@ -315,13 +336,20 @@ class CallGuardViewModel(
                 }
             }.fold(
                 onSuccess = { result ->
-                    wizard.copy(previewInput = rawNumber, previewResult = result, previewError = null, previewStale = false)
+                    wizard.copy(
+                        previewInput = rawNumber,
+                        previewResult = result,
+                        previewError = null,
+                        previewNotice = null,
+                        previewStale = false,
+                    )
                 },
                 onFailure = { error ->
                     wizard.copy(
                         previewInput = rawNumber,
                         previewResult = null,
                         previewError = error.message ?: "Could not test this number.",
+                        previewNotice = null,
                         previewStale = false,
                     )
                 },
@@ -337,6 +365,7 @@ class CallGuardViewModel(
                 val state = _uiState.value
                 val wizard = state.wizard
                 val matcher = (validateMatcher(wizard) as? MatcherValidation.Valid)?.matcher ?: return@withLock
+                if (matcher is RuleMatcher.Contacts && !state.settings.contactsPermissionGranted) return@withLock
                 val id = wizard.editingRuleId ?: UUID.randomUUID().toString()
                 val newRule = BlockingRule(
                     id = id,
@@ -426,6 +455,7 @@ class CallGuardViewModel(
                 wizard = recomputeWizard(
                     changed.copy(
                         previewStale = changed.previewStale || changed.previewResult != null,
+                        previewNotice = null,
                     ),
                     state.rules,
                 ),
@@ -439,7 +469,11 @@ class CallGuardViewModel(
         }
     }
 
-    private fun recomputeWizard(wizard: WizardState, existingRules: List<BlockingRule>): WizardState {
+    private fun recomputeWizard(
+        wizard: WizardState,
+        existingRules: List<BlockingRule>,
+        contactsPermissionGranted: Boolean = _uiState.value.settings.contactsPermissionGranted,
+    ): WizardState {
         val validation = validateMatcher(wizard)
         val matcher = (validation as? MatcherValidation.Valid)?.matcher
         val error = (validation as? MatcherValidation.Invalid)?.message
@@ -468,7 +502,11 @@ class CallGuardViewModel(
             positiveExample = positive,
             negativeExample = negative,
             needsRegionOptions = needsRegion,
-            canSave = candidateRule != null,
+            canSave = candidateRule != null &&
+                (
+                    candidateRule.matcher !is RuleMatcher.Contacts ||
+                        contactsPermissionGranted
+                    ),
         )
     }
 
@@ -564,7 +602,7 @@ class CallGuardViewModel(
     private fun broadRegexWarningFor(pattern: String): String? {
         val trimmed = pattern.trim()
         return if (trimmed.isEmpty() || trimmed in BROAD_REGEX_PATTERNS) {
-            "This pattern matches almost any number. Consider \"starts with\"/\"ends with\", or a more specific pattern."
+            "This exact pattern is extremely broad. Consider \"starts with\"/\"ends with\", or a more specific pattern."
         } else {
             null
         }
@@ -595,7 +633,7 @@ class CallGuardViewModel(
                 } else {
                     "'${other.name}' wins for this number"
                 }
-                conflicts += "Conflicts with '${other.name}' (${other.action.name.lowercase()}) " +
+                conflicts += "Conflicts with '${other.name}' (${actionLabel(other.action)}) " +
                     "for numbers like $positiveDigits — $outcome."
             }
         }
@@ -673,6 +711,7 @@ class CallGuardViewModel(
         matcherDescription = describeMatcher(rule.matcher),
         enabled = rule.enabled,
         priority = rule.priority,
+        requiresContactsPermission = rule.matcher is RuleMatcher.Contacts,
     )
 
     private fun describeMatcher(matcher: RuleMatcher): String = when (matcher) {
@@ -686,10 +725,10 @@ class CallGuardViewModel(
         is RuleMatcher.Regex -> "advanced pattern: ${matcher.pattern}"
     }
 
-    private fun defaultRuleName(matcherType: WizardMatcherType, action: RuleAction): String {
-        val actionLabel = action.name.lowercase().replaceFirstChar { it.uppercase() }
-        return "$actionLabel: ${matcherType.label}"
-    }
+    private fun defaultRuleName(matcherType: WizardMatcherType, action: RuleAction): String = "${actionLabel(action)}: ${matcherType.label}"
+
+    private fun actionLabel(action: RuleAction): String =
+        action.name.lowercase().replaceFirstChar { it.uppercase() }
 
     private fun wizardStateFromRule(rule: BlockingRule): WizardState {
         var matcherType = WizardMatcherType.STARTS_WITH

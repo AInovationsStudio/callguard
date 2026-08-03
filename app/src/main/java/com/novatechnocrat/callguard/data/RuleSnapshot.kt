@@ -3,6 +3,7 @@ package studio.ainovations.callguard.data
 import studio.ainovations.callguard.domain.BlockingRule
 import studio.ainovations.callguard.domain.MatchResult
 import studio.ainovations.callguard.domain.RuleCompiler
+import studio.ainovations.callguard.domain.RuleMatcher
 
 /**
  * An immutable, fully compiled rule set published atomically by
@@ -19,6 +20,7 @@ import studio.ainovations.callguard.domain.RuleCompiler
  */
 class RuleSnapshot private constructor(
     private val compiled: RuleCompiler.CompiledRuleSet,
+    val hasContactRules: Boolean,
 ) {
 
     /**
@@ -42,6 +44,9 @@ class RuleSnapshot private constructor(
          *   over-long, or nested-repetition regex) — mirrors
          *   [RuleCompiler.compile]'s validation.
          */
-        fun compile(rules: List<BlockingRule>): RuleSnapshot = RuleSnapshot(RuleCompiler.compile(rules))
+        fun compile(rules: List<BlockingRule>): RuleSnapshot = RuleSnapshot(
+            compiled = RuleCompiler.compile(rules),
+            hasContactRules = rules.any { it.enabled && it.matcher == RuleMatcher.Contacts },
+        )
     }
 }

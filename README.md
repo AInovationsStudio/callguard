@@ -1,13 +1,15 @@
 # CallGuard
 
-Offline-first Android app for blocking or allowing incoming cellular calls
+Offline Android app for blocking or allowing incoming cellular calls
 using understandable, country-aware rules. Android package:
 `studio.ainovations.callguard`.
 
 The MVP includes a guided Compose rule editor, country-aware normalization,
 Room persistence, and an Android `CallScreeningService`. Screening is inactive
 until the user selects CallGuard as the system call-screening app. Contact
-matching is optional and requires an explicit contacts permission grant.
+matching is optional and requires an explicit contacts permission grant. Blocked
+calls remain in the system call log; CallGuard skips the blocked-call
+notification but does not hide evidence from the user.
 
 ## Reproducible container build
 
@@ -17,7 +19,8 @@ required. The source tree is mounted at `/workspace`; Gradle caches live in a
 named volume. No host credentials are copied into the image. Podman is the
 tested engine (rootless, non-root `developer` user via `--userns=keep-id`);
 Docker is supported best-effort via engine gating in the scripts
-(`CONTAINER_ENGINE=podman|docker` to override).
+(`CONTAINER_ENGINE=podman|docker` to override). Instrumentation additionally
+requires a working `/dev/kvm` device; the non-emulator gate does not.
 
 Build the debug APK:
 
@@ -82,7 +85,8 @@ Dependency locking is enabled in strict mode (`dependencyLocking` with
 verification is enforced at build time via the `--dependency-verification strict`
 flag passed by both scripts, backed by the committed
 `gradle/verification-metadata.xml` (sha-256). A fresh container build is
-reproducible and integrity-checked. The base image is pinned by immutable
+dependency-locked and integrity-checked; the project does not claim
+byte-for-byte reproducibility of every Android tool output. The base image is pinned by immutable
 digest and the Android command-line tools archive is checked against Google's
 published sha-1 and size before install.
 
@@ -93,7 +97,7 @@ settings.gradle.kts        # project + repository settings
 build.gradle.kts           # top-level plugin declarations
 gradle/libs.versions.toml  # version catalog
 app/                       # application module (namespace studio.ainovations.callguard)
-Containerfile              # reproducible build image
+Containerfile              # pinned, integrity-checked build image
 .devcontainer/             # VS Code dev container
 scripts/                   # build, tests, emulator, manifest, and dependency gates
 docs/screenshots/          # emulator-captured GUI snapshots

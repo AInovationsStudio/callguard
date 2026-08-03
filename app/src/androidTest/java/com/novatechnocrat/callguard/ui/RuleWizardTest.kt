@@ -8,7 +8,9 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -82,7 +84,9 @@ class RuleWizardTest {
         composeRule.onNodeWithTag(CallGuardTestTags.PREVIEW_INPUT_FIELD)
             .performTextInput("25718881234")
         composeRule.onNodeWithTag(CallGuardTestTags.PREVIEW_TEST_BUTTON).performClick()
-        composeRule.onNodeWithTag(CallGuardTestTags.WIZARD_SAVE_BUTTON).performClick()
+        composeRule.onNodeWithTag(CallGuardTestTags.WIZARD_SAVE_BUTTON)
+            .performScrollTo()
+            .performClick()
 
         assert(selectedMatcher == WizardMatcherType.STARTS_WITH)
         assert(selectedAction == RuleAction.BLOCK)
@@ -142,7 +146,7 @@ class RuleWizardTest {
         }
 
         composeRule.onNodeWithTag(CallGuardTestTags.PREVIEW_RESULT_ACTION, useUnmergedTree = true)
-            .assertTextEquals("Result: BLOCK")
+            .assertTextEquals("CallGuard would: Block")
         composeRule.onNodeWithTag(CallGuardTestTags.PREVIEW_RESULT_RULE_ID, useUnmergedTree = true)
             .assertTextEquals("Matched rule: rule-1")
         composeRule.onNodeWithTag(
@@ -150,5 +154,50 @@ class RuleWizardTest {
             useUnmergedTree = true,
         )
             .assertTextEquals("Starts with 1571888, so this call will be blocked.")
+    }
+
+    @Test
+    fun editStateKeepsTitleAndPriorityVisible() {
+        composeRule.setContent {
+            RuleWizardScreen(
+                state = WizardState(
+                    editingRuleId = "rule-1",
+                    priority = 12,
+                ),
+                availableRegions = emptyList(),
+                onInputChanged = { _, _ -> },
+                onMatcherSelected = {},
+                onActionSelected = {},
+                onPreviewTested = {},
+                onSave = {},
+                onCancel = {},
+            )
+        }
+
+        composeRule.onNodeWithText("Edit rule").assertIsDisplayed()
+        composeRule.onNodeWithTag(CallGuardTestTags.WIZARD_PRIORITY_FIELD).assertIsDisplayed()
+    }
+
+    @Test
+    fun contactsPreviewExplainsThatRealContactsAreNotSimulated() {
+        composeRule.setContent {
+            RuleWizardScreen(
+                state = WizardState(
+                    matcherType = WizardMatcherType.CONTACTS,
+                    previewNotice = "Contacts are not simulated here.",
+                ),
+                availableRegions = emptyList(),
+                onInputChanged = { _, _ -> },
+                onMatcherSelected = {},
+                onActionSelected = {},
+                onPreviewTested = {},
+                onSave = {},
+                onCancel = {},
+            )
+        }
+
+        composeRule.onNodeWithTag(CallGuardTestTags.PREVIEW_NOTICE)
+            .performScrollTo()
+            .assertIsDisplayed()
     }
 }

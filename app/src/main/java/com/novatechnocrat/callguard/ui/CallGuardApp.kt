@@ -5,7 +5,6 @@ import android.app.role.RoleManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
-import android.telephony.TelephonyManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,6 +28,7 @@ import studio.ainovations.callguard.data.PreferencesRepository
 import studio.ainovations.callguard.data.RuleRepository
 import studio.ainovations.callguard.data.callGuardDataStore
 import studio.ainovations.callguard.phone.PhoneNormalizer
+import studio.ainovations.callguard.screening.deviceRegionFor
 
 /**
  * The app's Compose entry point. [viewModel] defaults to a real,
@@ -88,6 +88,9 @@ fun CallGuardApp(viewModel: CallGuardViewModel = rememberDefaultCallGuardViewMod
                     onDeleteRule = viewModel::onRuleDeleted,
                     onToggleRule = viewModel::onRuleToggled,
                     onOpenSettings = viewModel::onSettingsOpened,
+                    screeningRoleStatus = state.settings.screeningRoleStatus,
+                    contactsPermissionGranted = state.settings.contactsPermissionGranted,
+                    onRequestScreeningRole = viewModel::onScreeningRoleRequested,
                 )
                 is CallGuardScreen.Wizard -> RuleWizardScreen(
                     state = state.wizard,
@@ -143,13 +146,6 @@ private fun rememberDefaultCallGuardViewModel(): CallGuardViewModel {
  * [PhoneNormalizer] already treats as "no device region" per its own
  * documented fallback order.
  */
-private fun deviceRegionFor(context: Context): String? {
-    val telephony = context.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
-    val simRegion = telephony?.networkCountryIso?.takeIf { it.isNotBlank() }
-    if (simRegion != null) return simRegion.uppercase()
-    return context.resources.configuration.locales.get(0)?.country?.takeIf { it.isNotBlank() }?.uppercase()
-}
-
 private fun contactsPermissionGranted(context: Context): Boolean =
     ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
 

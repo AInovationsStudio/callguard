@@ -5,21 +5,32 @@ import android.telecom.Call
 import android.telecom.CallScreeningService
 import android.telecom.CallScreeningService.CallResponse
 import studio.ainovations.callguard.data.CallGuardDatabase
-import studio.ainovations.callguard.data.CallGuardPreferences
 import studio.ainovations.callguard.data.PreferencesRepository
 import studio.ainovations.callguard.data.RuleRepository
+import studio.ainovations.callguard.data.RuleSnapshot
 import studio.ainovations.callguard.data.callGuardDataStore
 import studio.ainovations.callguard.domain.MatchResult
 import studio.ainovations.callguard.domain.RuleAction
 import studio.ainovations.callguard.phone.PhoneNormalizer
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.atomic.AtomicLong
 
 class CallGuardScreeningService : CallScreeningService() {
     private lateinit var ruleRepository: RuleRepository
     private lateinit var preferencesRepository: PreferencesRepository
     private lateinit var decisionResolver: ScreeningDecisionResolver
-    private lateinit var contactNumberProvider: ContactNumberProvider
+    private lateinit var contactNumberCache: ContactNumberCache
+    private lateinit var runtimeState: ScreeningRuntimeState
+    private lateinit var serviceScope: CoroutineScope
+    private val contactRefreshMutex = Mutex()
+    private val lastContactRefreshAt = AtomicLong(0L)
 
     override fun onCreate() {
         super.onCreate()
@@ -28,37 +39,70 @@ class CallGuardScreeningService : CallScreeningService() {
         ruleRepository = RuleRepository(CallGuardDatabase.build(context).ruleDao())
         preferencesRepository = PreferencesRepository(context.callGuardDataStore)
         decisionResolver = ScreeningDecisionResolver(normalizer)
-        contactNumberProvider = AndroidContactNumberProvider(
-            contentResolver = contentResolver,
-            normalizer = normalizer,
-            region = deviceRegionFor(context),
+        contactNumberCache = ContactNumberCache(
+            AndroidContactNumberProvider(
+                contentResolver = contentResolver,
+                normalizer = normalizer,
+            ),
         )
-        runBlocking { ruleRepository.refreshFromDisk() }
+        runtimeState = ScreeningRuntimeState()
+        serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        serviceScope.launch {
+            ruleRepository.observeRules().collectLatest { rules ->
+                runCatching { RuleSnapshot.compile(rules) }
+                    .onSuccess { runtimeState.publishRules(it) }
+                refreshContactsIfNeeded(runtimeState.current().preferences.defaultRegion, force = true)
+            }
+        }
+        serviceScope.launch {
+            preferencesRepository.preferences.collectLatest { preferences ->
+                runtimeState.publishPreferences(preferences)
+                refreshContactsIfNeeded(preferences.defaultRegion, force = true)
+            }
+        }
     }
 
     override fun onScreenCall(callDetails: Call.Details) {
+        val state = runtimeState.current()
+        refreshContactsIfNeeded(state.preferences.defaultRegion)
         val result = runCatching {
-            val preferences = runBlocking { preferencesRepository.preferences.first() }
-            val contacts = if (preferences.contactMatchingEnabled) {
-                runCatching { contactNumberProvider.loadCanonicalNumbers() }.getOrDefault(emptySet())
-            } else {
-                emptySet()
-            }
             decisionResolver.resolve(
-                snapshot = ruleRepository.compileSnapshot(),
+                snapshot = state.rules,
                 rawNumber = callDetails.handle?.schemeSpecificPart,
-                region = preferences.defaultRegion,
-                preferences = preferences,
-                contacts = contacts,
+                region = state.preferences.defaultRegion,
+                preferences = state.preferences,
+                contacts = state.contacts.numbers,
+                contactsAvailable = state.contacts.available,
             )
         }.getOrElse {
             MatchResult(
-                action = CallGuardPreferences.DEFAULT_UNKNOWN_NUMBER_ACTION,
+                action = state.preferences.unknownNumberAction,
                 ruleId = null,
-                explanation = "Screening failed safely; the default allow action was applied.",
+                explanation = "Screening encountered an internal error; the last known " +
+                    "fallback action was applied.",
             )
         }
         respondToCall(callDetails, result.toCallResponse())
+    }
+
+    override fun onDestroy() {
+        serviceScope.cancel()
+        super.onDestroy()
+    }
+
+    private fun refreshContactsIfNeeded(region: String?, force: Boolean = false) {
+        val state = runtimeState.current()
+        if (!state.preferences.contactMatchingEnabled || !state.rules.hasContactRules) return
+        val now = System.currentTimeMillis()
+        val lastRefresh = lastContactRefreshAt.get()
+        if (!force && now - lastRefresh < CONTACT_REFRESH_INTERVAL_MS) return
+        if (!lastContactRefreshAt.compareAndSet(lastRefresh, now)) return
+        serviceScope.launch {
+            contactRefreshMutex.withLock {
+                contactNumberCache.refresh(region)
+                runtimeState.publishContacts(contactNumberCache.current())
+            }
+        }
     }
 
     private fun MatchResult.toCallResponse(): CallResponse =
@@ -67,7 +111,6 @@ class CallGuardScreeningService : CallScreeningService() {
                 RuleAction.BLOCK -> {
                     setDisallowCall(true)
                     setRejectCall(true)
-                    setSkipCallLog(true)
                     setSkipNotification(true)
                 }
                 RuleAction.SILENCE -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -77,13 +120,7 @@ class CallGuardScreeningService : CallScreeningService() {
             }
         }.build()
 
-    private fun deviceRegionFor(context: android.content.Context): String? {
-        val telephony = context.getSystemService(android.content.Context.TELEPHONY_SERVICE)
-            as? android.telephony.TelephonyManager
-        val simRegion = telephony?.networkCountryIso?.takeIf { it.isNotBlank() }
-        if (simRegion != null) return simRegion.uppercase()
-        return context.resources.configuration.locales.get(0)?.country
-            ?.takeIf { it.isNotBlank() }
-            ?.uppercase()
+    private companion object {
+        const val CONTACT_REFRESH_INTERVAL_MS = 5 * 60 * 1000L
     }
 }

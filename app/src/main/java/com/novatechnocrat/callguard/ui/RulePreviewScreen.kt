@@ -29,6 +29,7 @@ fun RulePreviewScreen(
     onTestRequested: (String) -> Unit,
     result: MatchResult?,
     error: String?,
+    notice: String? = null,
     stale: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
@@ -63,6 +64,13 @@ fun RulePreviewScreen(
                 modifier = Modifier.padding(top = 8.dp).testTag(CallGuardTestTags.PREVIEW_ERROR),
             )
         }
+        if (notice != null) {
+            Text(
+                text = notice,
+                color = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.padding(top = 8.dp).testTag(CallGuardTestTags.PREVIEW_NOTICE),
+            )
+        }
         if (result != null) {
             Column(modifier = Modifier.padding(top = 8.dp)) {
                 if (stale) {
@@ -73,12 +81,12 @@ fun RulePreviewScreen(
                     )
                 }
                 Text(
-                    text = "Result: ${result.action.name}",
+                    text = "CallGuard would: ${result.action.name.lowercase().replaceFirstChar { it.uppercase() }}",
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.testTag(CallGuardTestTags.PREVIEW_RESULT_ACTION),
                 )
                 Text(
-                    text = "Matched rule: ${result.ruleId ?: "(none — default behavior)"}",
+                    text = "Matched rule: ${result.ruleId ?: "none (default behavior)"}",
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.testTag(CallGuardTestTags.PREVIEW_RESULT_RULE_ID),
                 )

@@ -95,7 +95,7 @@ fun SettingsScreen(
             }
 
             Column {
-                Text("Unknown or unparseable numbers", style = MaterialTheme.typography.titleSmall)
+                Text("Unknown or invalid numbers", style = MaterialTheme.typography.titleSmall)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     RuleAction.entries.forEach { action ->
                         FilterChip(
@@ -120,8 +120,8 @@ fun SettingsScreen(
                     }
                 } else {
                     Text(
-                        "Contacts access is not granted, so any \"anyone in your contacts\" rule is disabled " +
-                            "— it will never match, and CallGuard never treats it as \"match everyone.\"",
+                        "Contacts access is not granted, so contact rules cannot run. " +
+                            "CallGuard never treats this as \"match everyone.\"",
                         modifier = Modifier.testTag(CallGuardTestTags.SETTINGS_CONTACTS_PERMISSION_STATUS),
                     )
                     Button(
@@ -138,6 +138,6 @@ fun SettingsScreen(
 
 private fun screeningRoleDescription(status: ScreeningRoleStatus): String = when (status) {
     ScreeningRoleStatus.Active -> "CallGuard is the active call-screening app."
-    ScreeningRoleStatus.NotActive -> "CallGuard is not the active call-screening app yet. Rules will not run until you set it."
-    ScreeningRoleStatus.Unsupported -> "Call-screening status isn't available on this device yet."
+    ScreeningRoleStatus.NotActive -> "CallGuard is not protecting calls yet. Rules will not run until you activate it."
+    ScreeningRoleStatus.Unsupported -> "Call screening is not available on this device."
 }

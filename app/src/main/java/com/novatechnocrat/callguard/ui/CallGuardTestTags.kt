@@ -12,6 +12,8 @@ object CallGuardTestTags {
     const val RULE_TOGGLE_PREFIX = "rule_toggle_"
     const val RULE_DELETE_PREFIX = "rule_delete_"
     const val RULE_EDIT_PREFIX = "rule_edit_"
+    const val RULE_LIST_SCREENING_STATUS = "rule_list_screening_status"
+    const val RULE_DELETE_CONFIRM_BUTTON = "rule_delete_confirm_button"
 
     const val MATCHER_TYPE_CHIP_PREFIX = "matcher_type_chip_"
     const val ACTION_CHIP_PREFIX = "action_chip_"
@@ -21,6 +23,7 @@ object CallGuardTestTags {
     const val WIZARD_SPECIFIC_NUMBERS_FIELD = "wizard_specific_numbers_field"
     const val WIZARD_NAME_FIELD = "wizard_name_field"
     const val WIZARD_COUNTRY_FIELD = "wizard_country_field"
+    const val WIZARD_PRIORITY_FIELD = "wizard_priority_field"
     const val WIZARD_VALIDATION_ERROR = "wizard_validation_error"
     const val WIZARD_BROAD_REGEX_WARNING = "wizard_broad_regex_warning"
     const val WIZARD_CONFLICT_WARNING_PREFIX = "wizard_conflict_warning_"
@@ -37,6 +40,7 @@ object CallGuardTestTags {
     const val PREVIEW_RESULT_RULE_ID = "preview_result_rule_id"
     const val PREVIEW_RESULT_EXPLANATION = "preview_result_explanation"
     const val PREVIEW_ERROR = "preview_error"
+    const val PREVIEW_NOTICE = "preview_notice"
     const val PREVIEW_STALE = "preview_stale"
 
     const val SETTINGS_BUTTON = "settings_button"

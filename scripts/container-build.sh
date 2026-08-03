@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the CallGuard debug APK entirely inside the reproducible container.
+# Build the CallGuard debug APK entirely inside the pinned, integrity-checked container.
 # No host Java, Gradle, or Android SDK is required.
 set -euo pipefail
 

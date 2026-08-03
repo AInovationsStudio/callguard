@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import studio.ainovations.callguard.domain.RuleAction
+import java.util.Locale
 
 /**
  * The guided rule wizard. Every derived field it renders — validation
@@ -56,7 +57,10 @@ fun RuleWizardScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Create a rule", style = MaterialTheme.typography.headlineSmall)
+        Text(
+            if (state.editingRuleId == null) "Create a rule" else "Edit rule",
+            style = MaterialTheme.typography.headlineSmall,
+        )
 
         Text("What should CallGuard do?", style = MaterialTheme.typography.titleSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -97,7 +101,7 @@ fun RuleWizardScreen(
             Text(
                 "This number could be from more than one country: ${state.needsRegionOptions.joinToString(", ")}. " +
                     "Pick one above.",
-                color = MaterialTheme.colorScheme.error,
+                color = MaterialTheme.colorScheme.tertiary,
             )
         }
 
@@ -111,21 +115,21 @@ fun RuleWizardScreen(
         if (state.broadRegexWarning != null) {
             Text(
                 text = state.broadRegexWarning,
-                color = MaterialTheme.colorScheme.error,
+                color = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.testTag(CallGuardTestTags.WIZARD_BROAD_REGEX_WARNING),
             )
         }
         state.conflictWarnings.forEachIndexed { index, warning ->
             Text(
                 text = warning,
-                color = MaterialTheme.colorScheme.error,
+                color = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.testTag(CallGuardTestTags.WIZARD_CONFLICT_WARNING_PREFIX + index),
             )
         }
         if (state.matcherType == WizardMatcherType.CONTACTS && !contactsPermissionGranted) {
             Text(
-                "Contacts access is missing, so this rule will stay disabled until you grant permission.",
-                color = MaterialTheme.colorScheme.error,
+                "Contacts access is missing, so save is unavailable until you grant permission.",
+                color = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.testTag(CallGuardTestTags.WIZARD_CONTACTS_PERMISSION_WARNING),
             )
             OutlinedButton(
@@ -166,6 +170,16 @@ fun RuleWizardScreen(
             singleLine = true,
             modifier = Modifier.fillMaxWidth().testTag(CallGuardTestTags.WIZARD_NAME_FIELD),
         )
+        OutlinedTextField(
+            value = state.priority.toString(),
+            onValueChange = { onInputChanged(WizardField.PRIORITY, it) },
+            label = { Text("Priority (higher wins)") },
+            supportingText = {
+                Text("Use 0 for normal rules; use a higher number for an explicit exception.")
+            },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().testTag(CallGuardTestTags.WIZARD_PRIORITY_FIELD),
+        )
 
         RulePreviewScreen(
             testInput = state.previewInput,
@@ -173,6 +187,7 @@ fun RuleWizardScreen(
             onTestRequested = onPreviewTested,
             result = state.previewResult,
             error = state.previewError,
+            notice = state.previewNotice,
             stale = state.previewStale,
         )
 
@@ -267,7 +282,7 @@ internal fun CountryPicker(
             onClick = { expanded = true },
             modifier = Modifier.fillMaxWidth().testTag(CallGuardTestTags.WIZARD_COUNTRY_FIELD),
         ) {
-            Text("Country: ${selected ?: "Auto (device region)"}")
+            Text("Country: ${selected?.let(::countryDisplayName) ?: "Auto (device region)"}")
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
@@ -279,7 +294,7 @@ internal fun CountryPicker(
             )
             options.forEach { region ->
                 DropdownMenuItem(
-                    text = { Text(region) },
+                    text = { Text(countryDisplayName(region)) },
                     onClick = {
                         onSelected(region)
                         expanded = false
@@ -288,4 +303,9 @@ internal fun CountryPicker(
             }
         }
     }
+}
+
+private fun countryDisplayName(region: String): String {
+    val displayName = Locale("", region).getDisplayCountry(Locale.getDefault())
+    return if (displayName.isBlank() || displayName == region) region else "$displayName ($region)"
 }

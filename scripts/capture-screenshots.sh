@@ -86,10 +86,11 @@ mkdir -p docs/screenshots
         adb shell input keyevent 4
         sleep 1
         adb exec-out screencap -p > docs/screenshots/02-rule-wizard.png
-        adb shell input tap 85 1815
-        sleep 1
+        adb shell am force-stop studio.ainovations.callguard
+        adb shell monkey -p studio.ainovations.callguard 1 >/dev/null
+        sleep 2
         adb shell input tap 950 140
-        sleep 1
+        sleep 3
         adb exec-out screencap -p > docs/screenshots/03-settings.png
     '
 
