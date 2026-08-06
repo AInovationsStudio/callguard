@@ -36,23 +36,31 @@ class ScreeningDecisionResolver(
         if (rawNumber.isNullOrBlank()) {
             return fallback(preferences)
         }
-        if (snapshot.hasContactRules && preferences.contactMatchingEnabled && !contactsAvailable) {
-            return MatchResult(
-                action = preferences.unknownNumberAction,
-                ruleId = null,
-                explanation = "Contact matching is unavailable; the configured fallback action was applied.",
-            )
-        }
+        val contactMatchingRequired =
+            snapshot.hasContactRules && preferences.contactMatchingEnabled && !contactsAvailable
+        val effectiveContacts =
+            if (preferences.contactMatchingEnabled && contactsAvailable) contacts else emptySet()
 
         return when (
             val normalized = normalizer.normalize(
                 PhoneNumberInput(raw = rawNumber, region = effectiveRegion),
             )
         ) {
-            is PhoneNormalizationResult.Valid -> snapshot.evaluate(
-                numberDigits = normalized.phone.digits,
-                contacts = if (preferences.contactMatchingEnabled) contacts else emptySet(),
-            )
+            is PhoneNormalizationResult.Valid -> {
+                val matched = snapshot.evaluate(
+                    numberDigits = normalized.phone.digits,
+                    contacts = effectiveContacts,
+                )
+                when {
+                    matched.ruleId != null -> matched
+                    contactMatchingRequired -> MatchResult(
+                        action = preferences.unknownNumberAction,
+                        ruleId = null,
+                        explanation = "Contact matching is unavailable; the configured fallback action was applied.",
+                    )
+                    else -> matched
+                }
+            }
             is PhoneNormalizationResult.Invalid,
             is PhoneNormalizationResult.NeedsRegion,
             -> fallback(preferences)

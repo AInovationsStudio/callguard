@@ -133,6 +133,53 @@ class ScreeningDecisionTest {
     }
 
     @Test
+    fun ordinaryRuleWinsWhenContactsUnavailable() {
+        val result = resolver.resolve(
+            snapshot = RuleSnapshot.compile(
+                listOf(
+                    rule("contact-allow", RuleAction.ALLOW, RuleMatcher.Contacts),
+                    rule("prefix-block", RuleAction.BLOCK, RuleMatcher.StartsWith("1571888")),
+                ),
+            ),
+            rawNumber = "15718881234",
+            region = "US",
+            preferences = CallGuardPreferences(
+                defaultRegion = "US",
+                unknownNumberAction = RuleAction.ALLOW,
+                contactMatchingEnabled = true,
+            ),
+            contacts = emptySet(),
+            contactsAvailable = false,
+        )
+
+        assertEquals(RuleAction.BLOCK, result.action)
+        assertEquals("prefix-block", result.ruleId)
+    }
+
+    @Test
+    fun contactOnlyRuleUsesConfiguredFallbackWhenContactsUnavailable() {
+        val result = resolver.resolve(
+            snapshot = RuleSnapshot.compile(
+                listOf(rule("contact-allow", RuleAction.ALLOW, RuleMatcher.Contacts)),
+            ),
+            rawNumber = "15718881234",
+            region = "US",
+            preferences = CallGuardPreferences(
+                defaultRegion = "US",
+                unknownNumberAction = RuleAction.BLOCK,
+                contactMatchingEnabled = true,
+            ),
+            contacts = emptySet(),
+            contactsAvailable = false,
+        )
+
+        assertEquals(RuleAction.BLOCK, result.action)
+        assertNull(result.ruleId)
+        assertTrue(result.explanation.contains("contact", ignoreCase = true))
+        assertTrue(result.explanation.contains("unavailable", ignoreCase = true))
+    }
+
+    @Test
     fun unavailableContactsUseConfiguredFallbackInsteadOfSilentNoOp() {
         val result = resolver.resolve(
             snapshot = RuleSnapshot.compile(
