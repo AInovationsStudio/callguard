@@ -161,6 +161,83 @@ class RuleWizardTest {
     }
 
     @Test
+    fun previewRendersApostropheRuleName() {
+        composeRule.setContent {
+            RulePreviewScreen(
+                testInput = "15718881234",
+                onTestInputChanged = {},
+                onTestRequested = {},
+                result = MatchResult(
+                    action = RuleAction.BLOCK,
+                    ruleId = "rule-1",
+                    explanation = "Rule 'Mom's phone' (rule-1) block — exact match: exactly 15718881234.",
+                ),
+                error = null,
+            )
+        }
+
+        composeRule.onNodeWithTag(CallGuardTestTags.PREVIEW_RESULT_RULE_ID, useUnmergedTree = true)
+            .assertTextEquals("Matched rule: Mom's phone")
+        composeRule.onNodeWithTag(
+            CallGuardTestTags.PREVIEW_RESULT_EXPLANATION,
+            useUnmergedTree = true,
+        )
+            .assertTextEquals("block — exact match: exactly 15718881234.")
+    }
+
+    @Test
+    fun previewFallsBackToRuleIdWhenExplanationDoesNotMatch() {
+        composeRule.setContent {
+            RulePreviewScreen(
+                testInput = "15718881234",
+                onTestInputChanged = {},
+                onTestRequested = {},
+                result = MatchResult(
+                    action = RuleAction.BLOCK,
+                    ruleId = "raw-uuid-123",
+                    explanation = "Some legacy or unexpected explanation format.",
+                ),
+                error = null,
+            )
+        }
+
+        composeRule.onNodeWithTag(CallGuardTestTags.PREVIEW_RESULT_RULE_ID, useUnmergedTree = true)
+            .assertTextEquals("Matched rule: raw-uuid-123")
+        composeRule.onNodeWithTag(
+            CallGuardTestTags.PREVIEW_RESULT_EXPLANATION,
+            useUnmergedTree = true,
+        )
+            .assertTextEquals("Some legacy or unexpected explanation format.")
+    }
+
+    @Test
+    fun previewShowsDefaultBehaviorWhenRuleIdIsNull() {
+        composeRule.setContent {
+            RulePreviewScreen(
+                testInput = "15718881234",
+                onTestInputChanged = {},
+                onTestRequested = {},
+                result = MatchResult(
+                    action = RuleAction.ALLOW,
+                    ruleId = null,
+                    explanation = "No enabled rule matched; default allow.",
+                ),
+                error = null,
+            )
+        }
+
+        composeRule.onNodeWithTag(CallGuardTestTags.PREVIEW_RESULT_ACTION, useUnmergedTree = true)
+            .assertTextEquals("CallGuard would: Allow")
+        composeRule.onNodeWithTag(CallGuardTestTags.PREVIEW_RESULT_RULE_ID, useUnmergedTree = true)
+            .assertTextEquals("Matched rule: none (default behavior)")
+        composeRule.onNodeWithTag(
+            CallGuardTestTags.PREVIEW_RESULT_EXPLANATION,
+            useUnmergedTree = true,
+        )
+            .assertTextEquals("No enabled rule matched; default allow.")
+    }
+
+    @Test
     fun editStateKeepsTitleAndPriorityVisible() {
         composeRule.setContent {
             RuleWizardScreen(

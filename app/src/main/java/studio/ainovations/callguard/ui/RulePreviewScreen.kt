@@ -15,20 +15,48 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import studio.ainovations.callguard.domain.MatchResult
 
-private val RULE_EXPLANATION =
-    Regex("^Rule '([^']+)' \\(([^)]+)\\) (\\w+) — (.+)\\.$")
+private const val RULE_EXPLANATION_PREFIX = "Rule '"
+private const val RULE_NAME_END_MARKER = "' ("
+
+internal data class ParsedRuleExplanation(
+    val name: String,
+    val ruleId: String,
+    val action: String,
+    val detail: String,
+)
+
+internal fun parseRuleExplanation(explanation: String): ParsedRuleExplanation? {
+    if (!explanation.startsWith(RULE_EXPLANATION_PREFIX)) return null
+    val nameEnd = explanation.lastIndexOf(RULE_NAME_END_MARKER)
+    if (nameEnd <= RULE_EXPLANATION_PREFIX.length) return null
+    val name = explanation.substring(RULE_EXPLANATION_PREFIX.length, nameEnd)
+    val afterName = explanation.substring(nameEnd + RULE_NAME_END_MARKER.length)
+    val idEnd = afterName.indexOf(')')
+    if (idEnd < 0) return null
+    val ruleId = afterName.substring(0, idEnd)
+    val remainder = afterName.substring(idEnd + 1).trimStart()
+    val emDash = remainder.indexOf(" — ")
+    if (emDash < 0) return null
+    val action = remainder.substring(0, emDash)
+    val detailWithDot = remainder.substring(emDash + 3)
+    if (!detailWithDot.endsWith('.')) return null
+    return ParsedRuleExplanation(
+        name = name,
+        ruleId = ruleId,
+        action = action,
+        detail = detailWithDot.removeSuffix("."),
+    )
+}
 
 internal fun matchedRuleLabel(result: MatchResult): String =
     when {
         result.ruleId == null -> "none (default behavior)"
-        else -> RULE_EXPLANATION.find(result.explanation)?.groupValues?.get(1) ?: result.ruleId
+        else -> parseRuleExplanation(result.explanation)?.name ?: result.ruleId
     }
 
 internal fun previewDiagnosticExplanation(result: MatchResult): String {
-    val match = RULE_EXPLANATION.find(result.explanation) ?: return result.explanation
-    val action = match.groupValues[3]
-    val detail = match.groupValues[4]
-    return "$action — $detail."
+    val parsed = parseRuleExplanation(result.explanation) ?: return result.explanation
+    return "${parsed.action} — ${parsed.detail}."
 }
 
 /**
