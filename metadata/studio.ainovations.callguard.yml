@@ -54,7 +54,7 @@ Builds:
   - versionName: '0.1.0'
     versionCode: 1
     # Pinned release-candidate source; F-Droid submission remains separate.
-    commit: fdf5ef8e863756ef736a1d73d6989030f7de769f
+    commit: eb309c53f3a27c3cced4eb95de177fe97e06d2f9
     subdir: app
     gradle:
       - yes
