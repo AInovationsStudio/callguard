@@ -140,6 +140,42 @@ class CallGuardViewModelTest {
         assertEquals(false, dataStore.data.first()[KEY_CONTACT_MATCHING_ENABLED])
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun revokedPermissionOnColdStartDoesNotSilentlyRetainContactMatching() = runBlocking {
+        // Pre-seed DataStore with contact_matching_enabled=true (the user had
+        // matching on before a cold start) and revoke permission from
+        // construction. The persisted preference emission lands AFTER
+        // refreshPermissionState has already run in init, so the invariant
+        // must be enforced when preferences are applied.
+        val seeded = emptyPreferences().toMutablePreferences()
+            .apply { this[KEY_CONTACT_MATCHING_ENABLED] = true }
+            .toPreferences()
+        val dataStore = FakeDataStore(seeded)
+        assertEquals(true, dataStore.data.first()[KEY_CONTACT_MATCHING_ENABLED])
+
+        val viewModel = CallGuardViewModel(
+            ruleRepository = RuleRepository(FakeRuleDao()),
+            preferencesRepository = PreferencesRepository(dataStore),
+            normalizer = PhoneNormalizer(deviceRegion = { "US" }),
+            contactsPermissionGranted = { false },
+            scope = CoroutineScope(Dispatchers.Default.limitedParallelism(2)),
+        )
+
+        // The preferences emission must enforce the invariant: contact
+        // matching is forced false in UI and the persisted preference is
+        // overwritten false, regardless of the prior UI state.
+        withTimeout(3_000) {
+            while (dataStore.data.first()[KEY_CONTACT_MATCHING_ENABLED] != false) delay(10)
+        }
+        assertEquals(false, dataStore.data.first()[KEY_CONTACT_MATCHING_ENABLED])
+        assertFalse(viewModel.uiState.value.settings.contactsPermissionGranted)
+        assertFalse(
+            "contact matching must be forced false in UI on a cold start with revoked permission",
+            viewModel.uiState.value.settings.contactMatchingEnabled,
+        )
+    }
+
     private fun rule(id: String, prefix: String) = BlockingRule(
         id = id,
         name = id,

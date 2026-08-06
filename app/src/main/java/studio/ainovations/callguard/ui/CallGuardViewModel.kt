@@ -216,15 +216,27 @@ class CallGuardViewModel(
     }
 
     private fun onPreferencesChanged(preferences: CallGuardPreferences) {
+        // Enforce the revocation invariant when preferences are applied, not
+        // only in refreshPermissionState. On a cold start the persisted
+        // preference can emit AFTER refreshPermissionState has already run
+        // in init, so a stale contact_matching_enabled=true would silently
+        // re-enable matching despite revoked permission. If contacts access
+        // is not granted, contact matching is forced false here and the
+        // disable is persisted, regardless of prior UI state.
+        val contactsGranted = contactsPermissionGranted()
+        val effectiveContactMatching = if (contactsGranted) preferences.contactMatchingEnabled else false
         _uiState.update { state ->
             state.copy(
                 settings = state.settings.copy(
                     defaultRegion = preferences.defaultRegion,
                     unknownNumberAction = preferences.unknownNumberAction,
-                    contactMatchingEnabled = preferences.contactMatchingEnabled,
+                    contactMatchingEnabled = effectiveContactMatching,
                 ),
                 wizard = recomputeWizard(state.wizard, state.rules),
             )
+        }
+        if (!contactsGranted && preferences.contactMatchingEnabled) {
+            scope.launch { preferencesRepository.setContactMatchingEnabled(false) }
         }
     }
 
