@@ -10,8 +10,7 @@ backend.
 > **Early release:** CallGuard is under active development. Review the source,
 > run the gates, and treat pre-release APKs as testing builds.
 
-[![Build](https://github.com/AInovationsStudio/callguard/actions/workflows/build.yml/badge.svg)](https://github.com/AInovationsStudio/callguard/actions/workflows/build.yml)
-[![Android](https://img.shields.io/badge/Android-API%2026%2B-3ddc84?logo=android&logoColor=white)](https://developer.android.com/)
+[![Android](https://img.shields.io/badge/Screening-Android%2010%2B%20(API%2029)-3ddc84?logo=android&logoColor=white)](https://developer.android.com/)
 [![F-Droid](https://img.shields.io/badge/F--Droid-planned-6f42c1)](#distribution)
 
 ## Why CallGuard
@@ -141,6 +140,9 @@ CallGuard is intentionally narrow:
   implied.
 - Android must designate CallGuard as the active call-screening app. The
   Settings screen reports the system role rather than assuming it was granted.
+- The APK install floor is API 26, but active call screening requires Android
+  10/API 29 or newer. Older devices can inspect the interface but cannot use
+  the screening role.
 - Contact rules require the user to grant `READ_CONTACTS`. If that permission
   is absent or contact data cannot be loaded, CallGuard follows the configured
   fallback instead of pretending contact matching succeeded.
@@ -158,6 +160,10 @@ also covered by tests and visible UI warnings where they affect a decision.
 | Rules | Create a rule | Settings |
 |---|---|---|
 | ![CallGuard rules screen](docs/screenshots/01-rule-list.png) | ![CallGuard rule wizard](docs/screenshots/02-rule-wizard.png) | ![CallGuard settings screen](docs/screenshots/03-settings.png) |
+
+Populated rule-list state:
+
+![CallGuard populated rule list](docs/screenshots/04-rule-list-populated.png)
 
 ## Distribution
 

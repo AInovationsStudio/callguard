@@ -73,24 +73,46 @@ mkdir -p docs/screenshots
             cat /tmp/callguard-emulator.log >&2
             exit 1
         }
+        assert_ui_contains() {
+            local expected="$1"
+            local dump
+            adb shell uiautomator dump /sdcard/callguard-window.xml >/dev/null
+            dump="$(adb shell cat /sdcard/callguard-window.xml)"
+            [[ "$dump" == *"$expected"* ]] || {
+                echo "error: expected UI text not found: $expected" >&2
+                echo "$dump" >&2
+                exit 1
+            }
+        }
         ./gradlew --no-daemon --dependency-verification strict assembleDebug
         adb install -r app/build/outputs/apk/debug/app-debug.apk >/dev/null
         adb shell am force-stop studio.ainovations.callguard
         adb shell monkey -p studio.ainovations.callguard 1 >/dev/null
         sleep 5
+        assert_ui_contains "No rules yet"
         adb exec-out screencap -p > docs/screenshots/01-rule-list.png
         adb shell input tap 965 1740
         sleep 1
+        assert_ui_contains "Create a rule"
         adb shell input tap 400 800
         adb shell input text 1571888
         adb shell input keyevent 4
         sleep 1
+        assert_ui_contains "Create a rule"
         adb exec-out screencap -p > docs/screenshots/02-rule-wizard.png
+        adb shell input swipe 540 1700 540 500 500
+        sleep 1
+        assert_ui_contains "Save rule"
+        adb shell input tap 450 1750
+        sleep 2
+        assert_ui_contains "Block: Starts with"
+        adb exec-out screencap -p > docs/screenshots/04-rule-list-populated.png
         adb shell am force-stop studio.ainovations.callguard
         adb shell monkey -p studio.ainovations.callguard 1 >/dev/null
         sleep 5
         adb shell input tap 950 140
         sleep 3
+        assert_ui_contains "Settings"
         adb exec-out screencap -p > docs/screenshots/03-settings.png
     '
 
