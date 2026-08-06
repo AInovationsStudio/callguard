@@ -15,6 +15,22 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import studio.ainovations.callguard.domain.MatchResult
 
+private val RULE_EXPLANATION =
+    Regex("^Rule '([^']+)' \\(([^)]+)\\) (\\w+) — (.+)\\.$")
+
+internal fun matchedRuleLabel(result: MatchResult): String =
+    when {
+        result.ruleId == null -> "none (default behavior)"
+        else -> RULE_EXPLANATION.find(result.explanation)?.groupValues?.get(1) ?: result.ruleId
+    }
+
+internal fun previewDiagnosticExplanation(result: MatchResult): String {
+    val match = RULE_EXPLANATION.find(result.explanation) ?: return result.explanation
+    val action = match.groupValues[3]
+    val detail = match.groupValues[4]
+    return "$action — $detail."
+}
+
 /**
  * Manual "test a number" section: routes [testInput] through
  * [CallGuardViewModel.onPreviewTested] (never a hand-rolled matcher check
@@ -86,12 +102,12 @@ fun RulePreviewScreen(
                     modifier = Modifier.testTag(CallGuardTestTags.PREVIEW_RESULT_ACTION),
                 )
                 Text(
-                    text = "Matched rule: ${result.ruleId ?: "none (default behavior)"}",
+                    text = "Matched rule: ${matchedRuleLabel(result)}",
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.testTag(CallGuardTestTags.PREVIEW_RESULT_RULE_ID),
                 )
                 Text(
-                    text = result.explanation,
+                    text = previewDiagnosticExplanation(result),
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.testTag(CallGuardTestTags.PREVIEW_RESULT_EXPLANATION),
                 )

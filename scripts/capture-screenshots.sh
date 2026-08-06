@@ -99,6 +99,7 @@ mkdir -p docs/screenshots
         adb shell input keyevent 4
         sleep 1
         assert_ui_contains "Create a rule"
+        assert_ui_contains "Test a number"
         adb exec-out screencap -p > docs/screenshots/02-rule-wizard.png
         adb shell input swipe 540 1700 540 500 500
         sleep 1
@@ -113,6 +114,11 @@ mkdir -p docs/screenshots
         adb shell input tap 950 140
         sleep 3
         assert_ui_contains "Settings"
+        assert_ui_contains "Call-screening role"
+        adb shell input swipe 540 1600 540 700 500
+        sleep 1
+        assert_ui_contains "About"
+        assert_ui_contains "Version"
         adb exec-out screencap -p > docs/screenshots/03-settings.png
     '
 

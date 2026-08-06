@@ -133,7 +133,7 @@ class RuleWizardTest {
     }
 
     @Test
-    fun previewRendersActionRuleIdAndExplanation() {
+    fun previewRendersActionRuleNameAndExplanation() {
         composeRule.setContent {
             RulePreviewScreen(
                 testInput = "15718881234",
@@ -142,7 +142,8 @@ class RuleWizardTest {
                 result = MatchResult(
                     action = RuleAction.BLOCK,
                     ruleId = "rule-1",
-                    explanation = "Starts with 1571888, so this call will be blocked.",
+                    explanation = "Rule 'Block: Starts with 1571888' (rule-1) block — " +
+                        "prefix/suffix/range/contains match: starts with 1571888.",
                 ),
                 error = null,
             )
@@ -151,12 +152,12 @@ class RuleWizardTest {
         composeRule.onNodeWithTag(CallGuardTestTags.PREVIEW_RESULT_ACTION, useUnmergedTree = true)
             .assertTextEquals("CallGuard would: Block")
         composeRule.onNodeWithTag(CallGuardTestTags.PREVIEW_RESULT_RULE_ID, useUnmergedTree = true)
-            .assertTextEquals("Matched rule: rule-1")
+            .assertTextEquals("Matched rule: Block: Starts with 1571888")
         composeRule.onNodeWithTag(
             CallGuardTestTags.PREVIEW_RESULT_EXPLANATION,
             useUnmergedTree = true,
         )
-            .assertTextEquals("Starts with 1571888, so this call will be blocked.")
+            .assertTextEquals("block — prefix/suffix/range/contains match: starts with 1571888.")
     }
 
     @Test
