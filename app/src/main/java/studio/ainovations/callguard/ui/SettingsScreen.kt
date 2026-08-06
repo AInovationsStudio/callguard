@@ -37,6 +37,8 @@ import studio.ainovations.callguard.ui.theme.irisBackdrop
 /** Shared user-facing copy aligned with README product language. */
 internal object CallGuardUiCopy {
     const val SCREENING_ROLE_CTA = "Set CallGuard as screening app"
+    const val SCREENING_ROLE_INACTIVE_BANNER =
+        "Set CallGuard as screening app before relying on these rules."
     const val CONTACTS_REPAIR_CTA = "Fix contacts access"
     const val CONTACTS_PERMISSION_WARNING =
         "Contact-based rules need Contacts access. Without it, CallGuard skips contact matching " +

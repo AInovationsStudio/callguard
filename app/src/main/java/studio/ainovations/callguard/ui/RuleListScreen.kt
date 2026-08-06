@@ -109,7 +109,7 @@ fun RuleListScreen(
                                 style = MaterialTheme.typography.titleSmall,
                             )
                             if (screeningRoleStatus == ScreeningRoleStatus.NotActive) {
-                                Text("Set CallGuard as the screening app before relying on these rules.")
+                                Text(CallGuardUiCopy.SCREENING_ROLE_INACTIVE_BANNER)
                                 Button(onClick = onRequestScreeningRole) {
                                     Text(CallGuardUiCopy.SCREENING_ROLE_CTA)
                                 }
@@ -202,7 +202,7 @@ private fun RuleRow(
                 modifier = Modifier
                     .testTag(CallGuardTestTags.RULE_TOGGLE_PREFIX + item.id)
                     .semantics {
-                        contentDescription = "Rule enabled, ${item.name}"
+                        contentDescription = "${item.name} rule"
                         stateDescription = if (item.enabled) "On" else "Off"
                     },
             )

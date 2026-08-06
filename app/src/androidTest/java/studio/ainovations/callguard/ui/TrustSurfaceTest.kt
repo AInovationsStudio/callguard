@@ -1,6 +1,8 @@
 package studio.ainovations.callguard.ui
 
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
@@ -42,6 +44,7 @@ class TrustSurfaceTest {
             .assertIsDisplayed()
         composeRule.onNodeWithText(CallGuardUiCopy.SCREENING_ROLE_CTA).assertIsDisplayed()
         composeRule.onNodeWithText("CallGuard is not protecting calls yet.").assertIsDisplayed()
+        composeRule.onNodeWithText(CallGuardUiCopy.SCREENING_ROLE_INACTIVE_BANNER).assertIsDisplayed()
     }
 
     @Test
@@ -229,6 +232,108 @@ class TrustSurfaceTest {
         composeRule.activity.onBackPressedDispatcher.onBackPressed()
         composeRule.waitForIdle()
         check(backCount == 1)
+    }
+
+    @Test
+    fun ruleToggleSemanticsUseStateNeutralDescription() {
+        composeRule.setContent {
+            RuleListScreen(
+                items = listOf(
+                    RuleListItem(
+                        id = "rule-1",
+                        name = "Suspicious callers",
+                        actionLabel = "Block",
+                        matcherDescription = "starts with 157",
+                        enabled = false,
+                        priority = 0,
+                        requiresContactsPermission = false,
+                    ),
+                ),
+                onAddRule = {},
+                onEditRule = {},
+                onDeleteRule = {},
+                onToggleRule = { _, _ -> },
+                onOpenSettings = {},
+                screeningRoleStatus = ScreeningRoleStatus.Active,
+            )
+        }
+
+        val toggle = composeRule.onNodeWithTag(CallGuardTestTags.RULE_TOGGLE_PREFIX + "rule-1")
+        toggle.assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Suspicious callers rule").assertIsDisplayed()
+        val semantics = toggle.fetchSemanticsNode().config
+        check(semantics.getOrNull(SemanticsProperties.StateDescription) == "Off")
+    }
+
+    @Test
+    fun ruleToggleSemanticsAnnounceOnWhenEnabled() {
+        composeRule.setContent {
+            RuleListScreen(
+                items = listOf(
+                    RuleListItem(
+                        id = "rule-2",
+                        name = "Trusted contacts",
+                        actionLabel = "Allow",
+                        matcherDescription = "contacts",
+                        enabled = true,
+                        priority = 0,
+                        requiresContactsPermission = true,
+                    ),
+                ),
+                onAddRule = {},
+                onEditRule = {},
+                onDeleteRule = {},
+                onToggleRule = { _, _ -> },
+                onOpenSettings = {},
+                screeningRoleStatus = ScreeningRoleStatus.Active,
+            )
+        }
+
+        val toggle = composeRule.onNodeWithTag(CallGuardTestTags.RULE_TOGGLE_PREFIX + "rule-2")
+        composeRule.onNodeWithContentDescription("Trusted contacts rule").assertIsDisplayed()
+        val semantics = toggle.fetchSemanticsNode().config
+        check(semantics.getOrNull(SemanticsProperties.StateDescription) == "On")
+    }
+
+    @Test
+    fun contactMatchingSwitchSemanticsReflectDisabledState() {
+        composeRule.setContent {
+            SettingsScreen(
+                state = SettingsUiState(contactsPermissionGranted = true, contactMatchingEnabled = false),
+                availableRegions = listOf("US"),
+                onDefaultRegionChanged = {},
+                onUnknownNumberActionChanged = {},
+                onContactMatchingToggled = {},
+                onRepairContactsPermission = {},
+                onBack = {},
+            )
+        }
+
+        val toggle = composeRule.onNodeWithTag(CallGuardTestTags.SETTINGS_CONTACT_MATCHING_SWITCH)
+        toggle.assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Match rules against your contacts").assertIsDisplayed()
+        val semantics = toggle.fetchSemanticsNode().config
+        check(semantics.getOrNull(SemanticsProperties.StateDescription) == "Off")
+    }
+
+    @Test
+    fun contactMatchingSwitchSemanticsReflectEnabledState() {
+        composeRule.setContent {
+            SettingsScreen(
+                state = SettingsUiState(contactsPermissionGranted = true, contactMatchingEnabled = true),
+                availableRegions = listOf("US"),
+                onDefaultRegionChanged = {},
+                onUnknownNumberActionChanged = {},
+                onContactMatchingToggled = {},
+                onRepairContactsPermission = {},
+                onBack = {},
+            )
+        }
+
+        val toggle = composeRule.onNodeWithTag(CallGuardTestTags.SETTINGS_CONTACT_MATCHING_SWITCH)
+        composeRule.onNodeWithContentDescription("Match rules against your contacts").assertIsDisplayed()
+        val semantics = toggle.fetchSemanticsNode().config
+        check(semantics.getOrNull(SemanticsProperties.StateDescription) == "On")
     }
 
     @Test
