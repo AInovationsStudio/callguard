@@ -30,18 +30,47 @@ class ScreeningRuntimeState(
 
     fun current(): ScreeningRuntimeSnapshot = state.get()
 
+    /**
+     * Publish a compiled rule snapshot from the Room observer. Observer
+     * publishes never mark initialization complete or incomplete: they
+     * preserve both [ScreeningRuntimeSnapshot.loaded] and
+     * [ScreeningRuntimeSnapshot.initializationError]. Only
+     * [publishInitial] may set `loaded = true` and only
+     * [publishInitializationFailure] may set `loaded = false`.
+     */
     fun publishRules(snapshot: RuleSnapshot) {
         state.updateAndGet { it.copy(rules = snapshot) }
     }
 
+    /**
+     * Publish preferences from the DataStore observer. Observer publishes
+     * never mark initialization complete or incomplete: they preserve both
+     * [ScreeningRuntimeSnapshot.loaded] and
+     * [ScreeningRuntimeSnapshot.initializationError]. Only
+     * [publishInitial] may set `loaded = true` and only
+     * [publishInitializationFailure] may set `loaded = false`.
+     */
     fun publishPreferences(preferences: CallGuardPreferences) {
         state.updateAndGet { it.copy(preferences = preferences) }
     }
 
+    /**
+     * Publish a refreshed contact cache from the contacts provider. Observer
+     * publishes never mark initialization complete or incomplete: they
+     * preserve both [ScreeningRuntimeSnapshot.loaded] and
+     * [ScreeningRuntimeSnapshot.initializationError].
+     */
     fun publishContacts(contacts: ContactCacheSnapshot) {
         state.updateAndGet { it.copy(contacts = contacts) }
     }
 
+    /**
+     * Publish the coherent initial snapshot assembled during bootstrap. This
+     * is the only way to set `loaded = true`; it also clears any prior
+     * initialization error. The screening service must complete this before
+     * starting its Room/DataStore observers so an observer emission can never
+     * be overwritten by a stale bootstrap snapshot.
+     */
     fun publishInitial(rules: RuleSnapshot, preferences: CallGuardPreferences) {
         state.updateAndGet {
             it.copy(
@@ -53,6 +82,13 @@ class ScreeningRuntimeState(
         }
     }
 
+    /**
+     * Record that bootstrap failed and keep the runtime explicitly unloaded
+     * so the screening callback fails open (`ALLOW`) until the next
+     * [publishInitial]. Observer publishes after this preserve `loaded =
+     * false` and the recorded error, so a failed bootstrap stays fail-open
+     * even as rules/preferences/contacts arrive.
+     */
     fun publishInitializationFailure(exceptionClass: Class<out Throwable>) {
         state.updateAndGet {
             it.copy(

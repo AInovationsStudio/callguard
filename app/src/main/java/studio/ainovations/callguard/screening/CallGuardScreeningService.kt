@@ -50,21 +50,30 @@ class CallGuardScreeningService : CallScreeningService() {
         )
         runtimeState = ScreeningRuntimeState()
         serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        // Bootstrap must publish one coherent initial snapshot BEFORE the Room
+        // and DataStore observers start replacing state. Launching them
+        // concurrently lets an observer emission land first and then be
+        // overwritten by the bootstrap snapshot — leaving the runtime serving
+        // stale rules until the next emission. Serializing bootstrap ahead
+        // of the observers guarantees the initial snapshot is coherent and
+        // that a completed bootstrap is never followed by a stale
+        // loaded=false state. A failed bootstrap still publishes an explicit
+        // loaded=false (fail-open) before the observers begin.
         serviceScope.launch {
             bootstrapRuntimeState()
-        }
-        serviceScope.launch {
-            ruleRepository.observeRules().collectLatest { rules ->
-                runCatching { RuleSnapshot.compile(rules) }
-                    .onSuccess { runtimeState.publishRules(it) }
-                    .onFailure { debugLog(ScreeningDiagnostics.failure(it)) }
-                refreshContactsIfNeeded(runtimeState.current().preferences.defaultRegion, force = true)
+            launch {
+                ruleRepository.observeRules().collectLatest { rules ->
+                    runCatching { RuleSnapshot.compile(rules) }
+                        .onSuccess { runtimeState.publishRules(it) }
+                        .onFailure { debugLog(ScreeningDiagnostics.failure(it)) }
+                    refreshContactsIfNeeded(runtimeState.current().preferences.defaultRegion, force = true)
+                }
             }
-        }
-        serviceScope.launch {
-            preferencesRepository.preferences.collectLatest { preferences ->
-                runtimeState.publishPreferences(preferences)
-                refreshContactsIfNeeded(preferences.defaultRegion, force = true)
+            launch {
+                preferencesRepository.preferences.collectLatest { preferences ->
+                    runtimeState.publishPreferences(preferences)
+                    refreshContactsIfNeeded(preferences.defaultRegion, force = true)
+                }
             }
         }
     }
