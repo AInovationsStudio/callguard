@@ -11,6 +11,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
@@ -59,20 +60,31 @@ class CallGuardScreeningService : CallScreeningService() {
         // that a completed bootstrap is never followed by a stale
         // loaded=false state. A failed bootstrap still publishes an explicit
         // loaded=false (fail-open) before the observers begin.
+        //
+        // The two observers are launched inside a supervisorScope so their
+        // failure domains stay independent: an uncaught exception in the Room
+        // observer does not cancel the DataStore observer (or vice versa),
+        // which a plain sibling `launch` under the outer coroutine would do.
+        // Bootstrap runs to completion first, then the supervisor scope
+        // starts; the supervisor scope itself does not return until both
+        // observers complete, so the outer coroutine stays alive for the
+        // lifetime of the observers.
         serviceScope.launch {
             bootstrapRuntimeState()
-            launch {
-                ruleRepository.observeRules().collectLatest { rules ->
-                    runCatching { RuleSnapshot.compile(rules) }
-                        .onSuccess { runtimeState.publishRules(it) }
-                        .onFailure { debugLog(ScreeningDiagnostics.failure(it)) }
-                    refreshContactsIfNeeded(runtimeState.current().preferences.defaultRegion, force = true)
+            supervisorScope {
+                launch {
+                    ruleRepository.observeRules().collectLatest { rules ->
+                        runCatching { RuleSnapshot.compile(rules) }
+                            .onSuccess { runtimeState.publishRules(it) }
+                            .onFailure { debugLog(ScreeningDiagnostics.failure(it)) }
+                        refreshContactsIfNeeded(runtimeState.current().preferences.defaultRegion, force = true)
+                    }
                 }
-            }
-            launch {
-                preferencesRepository.preferences.collectLatest { preferences ->
-                    runtimeState.publishPreferences(preferences)
-                    refreshContactsIfNeeded(preferences.defaultRegion, force = true)
+                launch {
+                    preferencesRepository.preferences.collectLatest { preferences ->
+                        runtimeState.publishPreferences(preferences)
+                        refreshContactsIfNeeded(preferences.defaultRegion, force = true)
+                    }
                 }
             }
         }
