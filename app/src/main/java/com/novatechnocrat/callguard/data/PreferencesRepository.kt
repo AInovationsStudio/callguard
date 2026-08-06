@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import studio.ainovations.callguard.domain.RuleAction
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.security.KeyStore
 import javax.crypto.Cipher
@@ -59,6 +60,9 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             contactMatchingEnabled = prefs[KEY_CONTACT_MATCHING_ENABLED] ?: false,
         )
     }
+
+    /** Reads the persisted preferences once during screening-service bootstrap. */
+    suspend fun bootstrapPreferences(): CallGuardPreferences = preferences.first()
 
     suspend fun setDefaultRegion(region: String?) {
         dataStore.edit { prefs ->

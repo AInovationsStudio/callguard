@@ -77,9 +77,9 @@ mkdir -p docs/screenshots
         adb install -r app/build/outputs/apk/debug/app-debug.apk >/dev/null
         adb shell am force-stop studio.ainovations.callguard
         adb shell monkey -p studio.ainovations.callguard 1 >/dev/null
-        sleep 2
+        sleep 5
         adb exec-out screencap -p > docs/screenshots/01-rule-list.png
-        adb shell input tap 1000 1800
+        adb shell input tap 965 1740
         sleep 1
         adb shell input tap 400 800
         adb shell input text 1571888
@@ -88,7 +88,7 @@ mkdir -p docs/screenshots
         adb exec-out screencap -p > docs/screenshots/02-rule-wizard.png
         adb shell am force-stop studio.ainovations.callguard
         adb shell monkey -p studio.ainovations.callguard 1 >/dev/null
-        sleep 2
+        sleep 5
         adb shell input tap 950 140
         sleep 3
         adb exec-out screencap -p > docs/screenshots/03-settings.png

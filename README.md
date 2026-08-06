@@ -1,8 +1,37 @@
 # CallGuard
 
-Offline Android app for blocking or allowing incoming cellular calls
-using understandable, country-aware rules. Android package:
-`studio.ainovations.callguard`.
+### Proof-shaped call control for Android
+
+CallGuard is an offline-first, privacy-minded call-screening app from
+[AInovations](https://ainovations.studio). It turns plain-language rules into
+predictable cellular-call decisions — without an account, ad network, or cloud
+backend.
+
+> **Early release:** CallGuard is under active development. Review the source,
+> run the gates, and treat pre-release APKs as testing builds.
+
+[![Build](https://github.com/AInovationsStudio/callguard/actions/workflows/build.yml/badge.svg)](https://github.com/AInovationsStudio/callguard/actions/workflows/build.yml)
+[![Android](https://img.shields.io/badge/Android-API%2026%2B-3ddc84?logo=android&logoColor=white)](https://developer.android.com/)
+[![F-Droid](https://img.shields.io/badge/F--Droid-planned-6f42c1)](#distribution)
+
+## Why CallGuard
+
+Most call blockers hide a complicated rule engine behind a single switch.
+CallGuard makes the decision visible:
+
+- **Exact number, starts with, ends with, contains, regex, contacts, and
+  specific-number rules**
+- **Country-aware normalization** for international and national formats
+- **Explicit block/allow behavior** with a configurable fallback for unknown
+  or invalid caller IDs
+- **Offline Android storage** using Room and DataStore
+- **System-owned call screening** through Android's `CallScreeningService`
+- **Readable explanations** so a rule is something you can inspect, not a
+  mystery toggle
+
+The visual language follows AInovations' light canvas, dark ink, and restrained
+iridescent accent: calm enough for a utility, distinctive enough to feel
+intentional.
 
 The MVP includes a guided Compose rule editor, country-aware normalization,
 Room persistence, and an Android `CallScreeningService`. Screening is inactive
@@ -102,3 +131,75 @@ Containerfile              # pinned, integrity-checked build image
 scripts/                   # build, tests, emulator, manifest, and dependency gates
 docs/screenshots/          # emulator-captured GUI snapshots
 ```
+
+## Trust model and important limits
+
+CallGuard is intentionally narrow:
+
+- It screens **cellular calls**, not SMS or messaging-app traffic. SMS support
+  would require a separate default-SMS-app implementation and is not silently
+  implied.
+- Android must designate CallGuard as the active call-screening app. The
+  Settings screen reports the system role rather than assuming it was granted.
+- Contact rules require the user to grant `READ_CONTACTS`. If that permission
+  is absent or contact data cannot be loaded, CallGuard follows the configured
+  fallback instead of pretending contact matching succeeded.
+- Blocked calls remain visible in the system call log. CallGuard suppresses the
+  blocked-call notification; it does not erase evidence or promise carrier-level
+  blocking.
+- Screening is local. No phone numbers, contacts, or rules are sent to a
+  remote service.
+
+These constraints are part of the product contract, not footnotes. They are
+also covered by tests and visible UI warnings where they affect a decision.
+
+## Screens
+
+| Rules | Create a rule | Settings |
+|---|---|---|
+| ![CallGuard rules screen](docs/screenshots/01-rule-list.png) | ![CallGuard rule wizard](docs/screenshots/02-rule-wizard.png) | ![CallGuard settings screen](docs/screenshots/03-settings.png) |
+
+## Distribution
+
+The intended release path is:
+
+1. Source review and deterministic container gates
+2. Signed test build and device verification
+3. F-Droid metadata and reproducible-build review
+4. Public release under a clearly identified FOSS license
+
+CallGuard is **not yet listed on F-Droid**. Do not mistake a GitHub Actions
+build badge or a locally produced APK for an F-Droid release. The first public
+release will include the license text, source-build instructions, metadata, and
+release provenance required by the selected distribution channel.
+
+## Development principles
+
+CallGuard is built around a simple promise: **make the decision inspectable**.
+That means:
+
+- deterministic tests for rule semantics and normalization edge cases;
+- explicit negative tests for malformed, disabled, or unavailable inputs;
+- dependency locks and artifact verification in the container build;
+- emulator-backed UI and service contract tests;
+- no analytics, no account requirement, and no network dependency in the
+  screening path.
+
+The review process and other model-assisted reviews are advisory. They produce
+transcripts and hypotheses; deterministic tests, source inspection, and human
+release judgment decide what ships.
+
+## Contributing
+
+Before the first public release, the project will publish its FOSS license,
+contribution guidance, security contact, and release policy. Until then, issue
+reports and review notes are welcome, but pre-release builds may change without
+compatibility guarantees.
+
+## Project
+
+CallGuard is an AInovations project:
+
+- Studio: [ainovations.studio](https://ainovations.studio)
+- Repository: [AInovationsStudio/callguard](https://github.com/AInovationsStudio/callguard)
+- Package: `studio.ainovations.callguard`

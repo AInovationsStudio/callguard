@@ -73,4 +73,21 @@ class PreferencesRepositoryTest {
         repo.setContactMatchingEnabled(false)
         assertEquals(false, repo.preferences.first().contactMatchingEnabled)
     }
+
+    @Test
+    fun bootstrapPreferencesReadsPersistedValuesBeforeTheFirstEvaluation() = runBlocking {
+        val store = FakeDataStore()
+        PreferencesRepository(store).apply {
+            setDefaultRegion("GB")
+            setUnknownNumberAction(RuleAction.BLOCK)
+            setContactMatchingEnabled(true)
+        }
+
+        val freshProcess = PreferencesRepository(store)
+        val preferences = freshProcess.bootstrapPreferences()
+
+        assertEquals("GB", preferences.defaultRegion)
+        assertEquals(RuleAction.BLOCK, preferences.unknownNumberAction)
+        assertEquals(true, preferences.contactMatchingEnabled)
+    }
 }

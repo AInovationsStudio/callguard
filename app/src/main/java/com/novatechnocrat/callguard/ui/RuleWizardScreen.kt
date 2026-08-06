@@ -1,6 +1,7 @@
 package studio.ainovations.callguard.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,10 +24,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import studio.ainovations.callguard.domain.RuleAction
+import studio.ainovations.callguard.ui.theme.GlassCard
+import studio.ainovations.callguard.ui.theme.irisBackdrop
 import java.util.Locale
 
 /**
@@ -53,14 +57,20 @@ fun RuleWizardScreen(
 ) {
     Column(
         modifier = modifier
+            .irisBackdrop()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(
-            if (state.editingRuleId == null) "Create a rule" else "Edit rule",
-            style = MaterialTheme.typography.headlineSmall,
-        )
+        Box(
+            modifier = Modifier.fillMaxWidth().testTag(CallGuardTestTags.WIZARD_TITLE),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                if (state.editingRuleId == null) "Create a rule" else "Edit rule",
+                style = MaterialTheme.typography.headlineSmall,
+            )
+        }
 
         Text("What should CallGuard do?", style = MaterialTheme.typography.titleSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -141,19 +151,21 @@ fun RuleWizardScreen(
         }
 
         if (state.positiveExample != null || state.negativeExample != null) {
-            Column {
-                Text("Examples", style = MaterialTheme.typography.labelLarge)
-                state.positiveExample?.let {
-                    Text(
-                        text = "Will match, e.g. ${it.digits}",
-                        modifier = Modifier.testTag(CallGuardTestTags.WIZARD_POSITIVE_EXAMPLE),
-                    )
-                }
-                state.negativeExample?.let {
-                    Text(
-                        text = "Will NOT match, e.g. ${it.digits}",
-                        modifier = Modifier.testTag(CallGuardTestTags.WIZARD_NEGATIVE_EXAMPLE),
-                    )
+            GlassCard(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Examples", style = MaterialTheme.typography.labelLarge)
+                    state.positiveExample?.let {
+                        Text(
+                            text = "Will match, e.g. ${it.digits}",
+                            modifier = Modifier.testTag(CallGuardTestTags.WIZARD_POSITIVE_EXAMPLE),
+                        )
+                    }
+                    state.negativeExample?.let {
+                        Text(
+                            text = "Will NOT match, e.g. ${it.digits}",
+                            modifier = Modifier.testTag(CallGuardTestTags.WIZARD_NEGATIVE_EXAMPLE),
+                        )
+                    }
                 }
             }
         } else {
@@ -181,15 +193,18 @@ fun RuleWizardScreen(
             modifier = Modifier.fillMaxWidth().testTag(CallGuardTestTags.WIZARD_PRIORITY_FIELD),
         )
 
-        RulePreviewScreen(
-            testInput = state.previewInput,
-            onTestInputChanged = { onInputChanged(WizardField.PREVIEW_INPUT, it) },
-            onTestRequested = onPreviewTested,
-            result = state.previewResult,
-            error = state.previewError,
-            notice = state.previewNotice,
-            stale = state.previewStale,
-        )
+        GlassCard(modifier = Modifier.fillMaxWidth()) {
+            RulePreviewScreen(
+                testInput = state.previewInput,
+                onTestInputChanged = { onInputChanged(WizardField.PREVIEW_INPUT, it) },
+                onTestRequested = onPreviewTested,
+                result = state.previewResult,
+                error = state.previewError,
+                notice = state.previewNotice,
+                stale = state.previewStale,
+                modifier = Modifier.padding(16.dp),
+            )
+        }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(

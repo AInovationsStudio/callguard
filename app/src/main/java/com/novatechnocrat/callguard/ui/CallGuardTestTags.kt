@@ -33,6 +33,7 @@ object CallGuardTestTags {
     const val WIZARD_CONTACTS_PERMISSION_BUTTON = "wizard_contacts_permission_button"
     const val WIZARD_SAVE_BUTTON = "wizard_save_button"
     const val WIZARD_CANCEL_BUTTON = "wizard_cancel_button"
+    const val WIZARD_TITLE = "wizard_title"
 
     const val PREVIEW_INPUT_FIELD = "preview_input_field"
     const val PREVIEW_TEST_BUTTON = "preview_test_button"
@@ -45,6 +46,7 @@ object CallGuardTestTags {
 
     const val SETTINGS_BUTTON = "settings_button"
     const val SETTINGS_CONTACTS_PERMISSION_STATUS = "settings_contacts_permission_status"
+    const val SETTINGS_CONTACTS_PERMISSION_WARNING = "settings_contacts_permission_warning"
     const val SETTINGS_CONTACTS_REPAIR_BUTTON = "settings_contacts_repair_button"
     const val SETTINGS_SCREENING_ROLE_STATUS = "settings_screening_role_status"
     const val SETTINGS_SCREENING_ROLE_BUTTON = "settings_screening_role_button"

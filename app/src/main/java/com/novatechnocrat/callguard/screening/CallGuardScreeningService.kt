@@ -4,6 +4,8 @@ import android.os.Build
 import android.telecom.Call
 import android.telecom.CallScreeningService
 import android.telecom.CallScreeningService.CallResponse
+import android.util.Log
+import studio.ainovations.callguard.BuildConfig
 import studio.ainovations.callguard.data.CallGuardDatabase
 import studio.ainovations.callguard.data.PreferencesRepository
 import studio.ainovations.callguard.data.RuleRepository
@@ -18,8 +20,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeout
 import java.util.concurrent.atomic.AtomicLong
 
 class CallGuardScreeningService : CallScreeningService() {
@@ -47,10 +51,14 @@ class CallGuardScreeningService : CallScreeningService() {
         )
         runtimeState = ScreeningRuntimeState()
         serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        runBlocking(Dispatchers.IO) {
+            bootstrapRuntimeState()
+        }
         serviceScope.launch {
             ruleRepository.observeRules().collectLatest { rules ->
                 runCatching { RuleSnapshot.compile(rules) }
                     .onSuccess { runtimeState.publishRules(it) }
+                    .onFailure { debugLog(ScreeningDiagnostics.failure(it)) }
                 refreshContactsIfNeeded(runtimeState.current().preferences.defaultRegion, force = true)
             }
         }
@@ -64,6 +72,7 @@ class CallGuardScreeningService : CallScreeningService() {
 
     override fun onScreenCall(callDetails: Call.Details) {
         val state = runtimeState.current()
+        debugLog(ScreeningDiagnostics.entry(state.loaded, state.rules.ruleCount))
         refreshContactsIfNeeded(state.preferences.defaultRegion)
         val result = runCatching {
             decisionResolver.resolve(
@@ -82,12 +91,41 @@ class CallGuardScreeningService : CallScreeningService() {
                     "fallback action was applied.",
             )
         }
+        debugLog(
+            ScreeningDiagnostics.decision(
+                loaded = state.loaded,
+                ruleCount = state.rules.ruleCount,
+                action = result.action,
+                ruleId = result.ruleId,
+            ),
+        )
         respondToCall(callDetails, result.toCallResponse())
     }
 
     override fun onDestroy() {
         serviceScope.cancel()
         super.onDestroy()
+    }
+
+    private suspend fun bootstrapRuntimeState() {
+        try {
+            withTimeout(BOOTSTRAP_TIMEOUT_MS) {
+                val rules = ruleRepository.bootstrapSnapshot()
+                val preferences = preferencesRepository.bootstrapPreferences()
+                runtimeState.publishInitial(rules, preferences)
+            }
+            val state = runtimeState.current()
+            debugLog(ScreeningDiagnostics.bootstrap(state.loaded, state.rules.ruleCount))
+        } catch (error: Throwable) {
+            runtimeState.publishInitializationFailure(error::class.java)
+            debugLog(ScreeningDiagnostics.failure(error))
+        }
+    }
+
+    private fun debugLog(message: String) {
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, message)
+        }
     }
 
     private fun refreshContactsIfNeeded(region: String?, force: Boolean = false) {
@@ -122,5 +160,7 @@ class CallGuardScreeningService : CallScreeningService() {
 
     private companion object {
         const val CONTACT_REFRESH_INTERVAL_MS = 5 * 60 * 1000L
+        const val BOOTSTRAP_TIMEOUT_MS = 2_000L
+        const val TAG = "CallGuardScreening"
     }
 }

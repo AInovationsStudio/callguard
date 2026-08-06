@@ -369,7 +369,7 @@ class CallGuardViewModel(
                 val id = wizard.editingRuleId ?: UUID.randomUUID().toString()
                 val newRule = BlockingRule(
                     id = id,
-                    name = wizard.name.ifBlank { defaultRuleName(wizard.matcherType, wizard.action) },
+                    name = wizard.name.ifBlank { defaultRuleNameForMatcher(matcher, wizard.action) },
                     enabled = true,
                     action = wizard.action,
                     matcher = matcher,
@@ -512,7 +512,7 @@ class CallGuardViewModel(
 
     private fun toCandidateRule(wizard: WizardState, matcher: RuleMatcher): BlockingRule = BlockingRule(
         id = wizard.editingRuleId ?: PENDING_RULE_ID,
-        name = wizard.name.ifBlank { defaultRuleName(wizard.matcherType, wizard.action) },
+        name = wizard.name.ifBlank { defaultRuleNameForMatcher(matcher, wizard.action) },
         enabled = true,
         action = wizard.action,
         matcher = matcher,
@@ -526,7 +526,7 @@ class CallGuardViewModel(
     }
 
     private fun validateMatcher(wizard: WizardState): MatcherValidation = when (wizard.matcherType) {
-        WizardMatcherType.STARTS_WITH -> digitsMatcher(wizard.rawValue, "starts-with value") { RuleMatcher.StartsWith(it) }
+        WizardMatcherType.STARTS_WITH -> startsWithMatcher(wizard.rawValue, wizard.country)
         WizardMatcherType.ENDS_WITH -> digitsMatcher(wizard.rawValue, "ends-with value") { RuleMatcher.EndsWith(it) }
         WizardMatcherType.CONTAINS -> digitsMatcher(wizard.rawValue, "contains value") { RuleMatcher.Contains(it) }
         WizardMatcherType.EXACT_NUMBER -> normalizeToExactValidation(wizard.rawValue, wizard.country)
@@ -534,6 +534,15 @@ class CallGuardViewModel(
         WizardMatcherType.CONTACTS -> MatcherValidation.Valid(RuleMatcher.Contacts)
         WizardMatcherType.SPECIFIC_NUMBERS -> specificNumbersMatcher(wizard.specificNumbersRaw, wizard.country)
         WizardMatcherType.ADVANCED_PATTERN -> regexMatcher(wizard.rawValue)
+    }
+
+    private fun startsWithMatcher(raw: String, region: String?): MatcherValidation {
+        val prefix = normalizer.normalizePrefix(raw, region)
+        return if (prefix.isEmpty()) {
+            MatcherValidation.Invalid("Enter the starts-with value (digits only).")
+        } else {
+            MatcherValidation.Valid(RuleMatcher.StartsWith(prefix))
+        }
     }
 
     private fun digitsMatcher(raw: String, label: String, build: (String) -> RuleMatcher): MatcherValidation {
@@ -725,8 +734,6 @@ class CallGuardViewModel(
         is RuleMatcher.Regex -> "advanced pattern: ${matcher.pattern}"
     }
 
-    private fun defaultRuleName(matcherType: WizardMatcherType, action: RuleAction): String = "${actionLabel(action)}: ${matcherType.label}"
-
     private fun actionLabel(action: RuleAction): String =
         action.name.lowercase().replaceFirstChar { it.uppercase() }
 
@@ -789,4 +796,18 @@ class CallGuardViewModel(
     }
 
     private class PreviewValidationException(message: String) : IllegalArgumentException(message)
+}
+
+internal fun defaultRuleNameForMatcher(matcher: RuleMatcher, action: RuleAction): String =
+    "${action.name.lowercase().replaceFirstChar { it.uppercase() }}: ${matcherLabel(matcher)}"
+
+private fun matcherLabel(matcher: RuleMatcher): String = when (matcher) {
+    is RuleMatcher.Exact -> "Exact number"
+    is RuleMatcher.StartsWith -> "Starts with"
+    is RuleMatcher.EndsWith -> "Ends with"
+    is RuleMatcher.Contains -> "Contains"
+    is RuleMatcher.Range -> "Number range"
+    is RuleMatcher.Contacts -> "Anyone in your contacts"
+    is RuleMatcher.SpecificNumbers -> "A list of specific numbers"
+    is RuleMatcher.Regex -> "Advanced pattern (regex)"
 }

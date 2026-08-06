@@ -270,6 +270,20 @@ class RuleRepositoryTest {
         assertEquals("r1", result.ruleId)
     }
 
+    @Test
+    fun bootstrapSnapshotLoadsPersistedRulesBeforeTheFirstEvaluation() = runBlocking {
+        val dao = FakeRuleDao()
+        RuleRepository(dao).replaceRules(
+            listOf(rule("bootstrap-block", RuleAction.BLOCK, RuleMatcher.Exact("15718881234"))),
+        )
+
+        val freshProcess = RuleRepository(dao)
+        val result = freshProcess.bootstrapSnapshot().evaluate("15718881234", emptySet())
+
+        assertEquals(RuleAction.BLOCK, result.action)
+        assertEquals("bootstrap-block", result.ruleId)
+    }
+
     /**
      * Regression test for the persistence layer review's Important finding:
      * [RuleRepository.refreshFromDisk] and [RuleRepository.replaceRules] both

@@ -98,6 +98,27 @@ class PhoneNormalizer(
         }
     }
 
+    /**
+     * Converts a user-entered national prefix into the canonical prefix used
+     * by [RuleMatcher][studio.ainovations.callguard.domain.RuleMatcher].
+     *
+     * Prefixes are intentionally not parsed as complete phone numbers: a
+     * short value such as an area code is not a valid number by itself. When a
+     * region is available, its country calling code is applied without
+     * inventing a country when the region is unknown.
+     */
+    fun normalizePrefix(raw: String, region: String?): String {
+        val digits = raw.filter(Char::isDigit)
+        if (digits.isEmpty() || raw.trim().startsWith("+")) return digits
+
+        val effectiveRegion = (region?.takeIf { it.isNotBlank() } ?: deviceRegion())
+            ?.uppercase()
+            ?.takeIf { it in util.supportedRegions }
+            ?: return digits
+        val countryCode = util.getCountryCodeForRegion(effectiveRegion).toString()
+        return if (digits.startsWith(countryCode)) digits else countryCode + digits
+    }
+
     private fun valid(parsed: Phonenumber.PhoneNumber): PhoneNormalizationResult.Valid {
         val e164 = util.format(parsed, PhoneNumberUtil.PhoneNumberFormat.E164)
         val digits = e164.removePrefix("+")

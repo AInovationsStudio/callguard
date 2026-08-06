@@ -21,6 +21,7 @@ import studio.ainovations.callguard.domain.RuleMatcher
 class RuleSnapshot private constructor(
     private val compiled: RuleCompiler.CompiledRuleSet,
     val hasContactRules: Boolean,
+    val ruleCount: Int,
 ) {
 
     /**
@@ -47,6 +48,7 @@ class RuleSnapshot private constructor(
         fun compile(rules: List<BlockingRule>): RuleSnapshot = RuleSnapshot(
             compiled = RuleCompiler.compile(rules),
             hasContactRules = rules.any { it.enabled && it.matcher == RuleMatcher.Contacts },
+            ruleCount = rules.count { it.enabled },
         )
     }
 }

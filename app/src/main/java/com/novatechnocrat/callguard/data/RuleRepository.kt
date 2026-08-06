@@ -90,9 +90,15 @@ class RuleRepository(
      * restart. A caller that always calls [replaceRules] before the first
      * [compileSnapshot] read (e.g. a test) can ignore it.
      */
-    suspend fun refreshFromDisk() {
-        writeMutex.withLock {
-            snapshotRef.set(RuleSnapshot.compile(ruleDao.getAllOnce().map { it.toDomain() }))
-        }
+    suspend fun refreshFromDisk(): RuleSnapshot = bootstrapSnapshot()
+
+    /**
+     * Loads and publishes the persisted rules for a newly created screening
+     * service before its first callback can evaluate the empty snapshot.
+     */
+    suspend fun bootstrapSnapshot(): RuleSnapshot = writeMutex.withLock {
+        val snapshot = RuleSnapshot.compile(ruleDao.getAllOnce().map { it.toDomain() })
+        snapshotRef.set(snapshot)
+        snapshot
     }
 }

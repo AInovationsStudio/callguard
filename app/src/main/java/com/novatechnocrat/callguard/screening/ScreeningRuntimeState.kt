@@ -19,6 +19,8 @@ data class ScreeningRuntimeSnapshot(
         contactMatchingEnabled = false,
     ),
     val contacts: ContactCacheSnapshot = ContactCacheSnapshot(),
+    val loaded: Boolean = false,
+    val initializationError: String? = null,
 )
 
 class ScreeningRuntimeState(
@@ -38,5 +40,25 @@ class ScreeningRuntimeState(
 
     fun publishContacts(contacts: ContactCacheSnapshot) {
         state.updateAndGet { it.copy(contacts = contacts) }
+    }
+
+    fun publishInitial(rules: RuleSnapshot, preferences: CallGuardPreferences) {
+        state.updateAndGet {
+            it.copy(
+                rules = rules,
+                preferences = preferences,
+                loaded = true,
+                initializationError = null,
+            )
+        }
+    }
+
+    fun publishInitializationFailure(exceptionClass: Class<out Throwable>) {
+        state.updateAndGet {
+            it.copy(
+                loaded = false,
+                initializationError = exceptionClass.name,
+            )
+        }
     }
 }

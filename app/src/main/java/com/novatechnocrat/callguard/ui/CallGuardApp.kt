@@ -8,7 +8,6 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -29,6 +28,7 @@ import studio.ainovations.callguard.data.RuleRepository
 import studio.ainovations.callguard.data.callGuardDataStore
 import studio.ainovations.callguard.phone.PhoneNormalizer
 import studio.ainovations.callguard.screening.deviceRegionFor
+import studio.ainovations.callguard.ui.theme.CallGuardTheme
 
 /**
  * The app's Compose entry point. [viewModel] defaults to a real,
@@ -78,7 +78,7 @@ fun CallGuardApp(viewModel: CallGuardViewModel = rememberDefaultCallGuardViewMod
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    MaterialTheme {
+    CallGuardTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
             when (state.screen) {
                 is CallGuardScreen.RuleList -> RuleListScreen(

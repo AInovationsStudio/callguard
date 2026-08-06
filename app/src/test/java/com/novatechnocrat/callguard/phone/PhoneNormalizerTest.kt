@@ -104,6 +104,22 @@ class PhoneNormalizerTest {
     }
 
     @Test
+    fun nationalPrefixUsesTheCountryCallingCode() {
+        val normalizer = PhoneNormalizer(deviceRegion = noDeviceRegion)
+
+        assertEquals("1703", normalizer.normalizePrefix("703", region = "US"))
+        assertEquals("1703", normalizer.normalizePrefix("1703", region = "US"))
+        assertEquals("1703", normalizer.normalizePrefix("+1703", region = "US"))
+    }
+
+    @Test
+    fun nationalPrefixFallsBackToDeviceRegion() {
+        val normalizer = PhoneNormalizer(deviceRegion = { "US" })
+
+        assertEquals("1703", normalizer.normalizePrefix("703", region = null))
+    }
+
+    @Test
     fun explicitRegionBeatsDeviceRegion() {
         val normalizer = PhoneNormalizer(deviceRegion = { "GB" })
         val result = normalizer.normalize(PhoneNumberInput(usNational, region = "US"))

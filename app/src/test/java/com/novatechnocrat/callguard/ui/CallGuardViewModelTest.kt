@@ -27,6 +27,18 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class CallGuardViewModelTest {
+    @Test
+    fun generatedRuleNameUsesThePersistedMatcherKind() {
+        assertEquals(
+            "Block: Contains",
+            defaultRuleNameForMatcher(RuleMatcher.Contains("1888"), RuleAction.BLOCK),
+        )
+        assertEquals(
+            "Block: Ends with",
+            defaultRuleNameForMatcher(RuleMatcher.EndsWith("1234"), RuleAction.BLOCK),
+        )
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun rapidTogglesAreAppliedToTheLatestCommittedRuleList() = runBlocking {
