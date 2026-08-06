@@ -1,0 +1,75 @@
+# F-Droid release-candidate metadata for CallGuard.
+#
+# STATUS: prepared for review, NOT submitted. This file has never been sent
+# to fdroiddata and CallGuard is not listed on F-Droid. Do not represent it
+# as a submission, and do not add signing keys, keystores, or any other
+# credential material to this file or this repository.
+#
+# RELEASE OWNER ACTION REQUIRED before any submission:
+#   The `commit` field below is an explicit placeholder, not a real commit.
+#   F-Droid's reproducible-build tooling requires an immutable reference
+#   (a commit SHA or signed tag) to the exact source it builds. That
+#   reference cannot exist honestly until this branch is reviewed, merged,
+#   and tagged by the release owner. Replace REPLACE_WITH_RELEASE_COMMIT
+#   with that commit SHA or tag (e.g. "v0.1.0") once it exists, and verify
+#   `versionName`/`versionCode` below still match app/build.gradle.kts at
+#   that reference before submitting.
+
+Categories:
+  - Phone & SMS
+
+License: Apache-2.0
+
+AuthorName: AInovations
+AuthorEmail: nova@ainovations.studio
+WebSite: https://ainovations.studio
+SourceCode: https://github.com/AInovationsStudio/callguard
+IssueTracker: https://github.com/AInovationsStudio/callguard/issues
+
+AutoName: CallGuard
+Summary: Proof-shaped, offline call screening
+Description: |-
+    CallGuard turns plain-language rules into predictable cellular call
+    decisions, entirely offline. It has no account, no ad network, and no
+    cloud backend: rule matching, contact lookup, and screening decisions all
+    happen on-device.
+
+    Features:
+
+    * Exact number, starts-with, ends-with, contains, regex, contact, and
+      specific-number rules, with country-aware normalization.
+    * Explicit block/allow behavior with a configurable fallback for unknown
+      or invalid caller IDs.
+    * Local storage only (Room + DataStore); no phone numbers, contacts, or
+      rules are sent to a remote service.
+    * Every decision is inspectable: rules and their explanations are visible,
+      not hidden behind a single toggle.
+
+    CallGuard screens cellular calls only (not SMS). Android must be told to
+    use CallGuard as the active call-screening app; contact-based rules
+    additionally require the Contacts permission and fall back to the
+    configured behavior when that permission or data is unavailable. Blocked
+    calls remain visible in the system call log.
+
+RepoType: git
+Repo: https://github.com/AInovationsStudio/callguard.git
+
+Builds:
+  - versionName: '0.1.0'
+    versionCode: 1
+    # See "RELEASE OWNER ACTION REQUIRED" above. Do not submit with this
+    # placeholder still in place.
+    commit: REPLACE_WITH_RELEASE_COMMIT
+    subdir: app
+    gradle:
+      - yes
+    # No signing config is committed to the source tree; F-Droid's own build
+    # server performs the signing this project does not carry credentials
+    # for. See scripts/container-release.sh for the equivalent unsigned
+    # local build path used to prepare this release candidate.
+
+AutoUpdateMode: None
+UpdateCheckMode: None
+
+CurrentVersion: '0.1.0'
+CurrentVersionCode: 1

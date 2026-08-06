@@ -1,0 +1,71 @@
+CallGuard
+Copyright 2026 AInovations
+
+This product includes software developed by third parties. Their license
+terms are unmodified by, and take precedence over, anything else in this
+file. This NOTICE is provided for informational purposes as required by
+Apache License, Version 2.0, Section 4(d), for the Apache-2.0-licensed
+dependencies bundled into the CallGuard APK. It does not itself grant any
+rights and does not change the terms under which CallGuard is distributed
+(see LICENSE).
+
+--------------------------------------------------------------------------------
+AndroidX (androidx.core, androidx.activity, androidx.lifecycle,
+androidx.compose.*, androidx.room, androidx.datastore, and their transitive
+androidx.* dependencies)
+--------------------------------------------------------------------------------
+Copyright (C) The Android Open Source Project
+Licensed under the Apache License, Version 2.0.
+Project: https://developer.android.com/jetpack/androidx
+License:  https://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+Jetpack Compose (androidx.compose.ui, androidx.compose.material3, and the
+Compose BOM used to align their versions)
+--------------------------------------------------------------------------------
+Copyright (C) The Android Open Source Project
+Licensed under the Apache License, Version 2.0.
+Project: https://developer.android.com/jetpack/compose
+License:  https://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+Room (androidx.room:room-runtime, androidx.room:room-ktx,
+androidx.room:room-compiler)
+--------------------------------------------------------------------------------
+Copyright (C) The Android Open Source Project
+Licensed under the Apache License, Version 2.0.
+Project: https://developer.android.com/jetpack/androidx/releases/room
+License:  https://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+DataStore (androidx.datastore:datastore-preferences)
+--------------------------------------------------------------------------------
+Copyright (C) The Android Open Source Project
+Licensed under the Apache License, Version 2.0.
+Project: https://developer.android.com/jetpack/androidx/releases/datastore
+License:  https://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+Kotlin (Kotlin standard library and kotlinx.coroutines)
+--------------------------------------------------------------------------------
+Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language
+contributors.
+Licensed under the Apache License, Version 2.0.
+Project: https://kotlinlang.org/
+License:  https://github.com/JetBrains/kotlin/blob/master/LICENSE
+
+--------------------------------------------------------------------------------
+libphonenumber
+--------------------------------------------------------------------------------
+Copyright Google Inc.
+Licensed under the Apache License, Version 2.0.
+Project: https://github.com/google/libphonenumber
+License:  https://github.com/google/libphonenumber/blob/master/LICENSE
+
+--------------------------------------------------------------------------------
+
+The exact set and versions of bundled dependencies are pinned in
+gradle/libs.versions.toml and locked in app/gradle.lockfile. This NOTICE
+covers the dependency families in that lockfile as of the current release
+candidate; it is not machine-generated and should be reviewed when
+dependency versions change materially.

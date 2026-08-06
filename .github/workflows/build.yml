@@ -1,3 +1,14 @@
+# This workflow runs the container-gate ONLY: formatting, lint, unit tests,
+# manifest audit, and a debug assemble, none of which need an emulator or
+# `/dev/kvm`. It intentionally does NOT run instrumentation
+# (`connectedDebugAndroidTest` / `container-test.sh --instrumentation`) or the
+# unsigned release build (`container-release.sh`) — GitHub-hosted `ubuntu-24.04`
+# runners do not reliably expose `/dev/kvm`, and an emulator boot attempt
+# without it is a flaky hang, not a gate. Instrumentation is a required
+# pre-release check the release owner runs locally/in a KVM-capable runner
+# (see README's "Reproducible container build" section); it does not run on
+# every push/PR here. Add an emulator job only once a runner with reliable
+# KVM is explicitly available and confirmed.
 name: CallGuard build
 
 on:
@@ -14,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run reproducible container gate
+      - name: Run reproducible container gate (formatting, lint, unit tests, manifest audit)
         env:
           CONTAINER_ENGINE: docker
         run: ./scripts/container-test.sh

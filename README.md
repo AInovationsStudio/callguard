@@ -88,6 +88,34 @@ Check dependency integrity directly:
 ./scripts/verify-dependencies.sh
 ```
 
+Build and verify the unsigned release candidate:
+
+```bash
+./scripts/container-release.sh   # clean assembleRelease in the pinned container
+./scripts/verify-apk.sh          # checks applicationId, version, and permissions
+```
+
+`container-release.sh` produces
+`app/build/outputs/apk/release/app-release-unsigned.apk`. The release build
+type has no configured `signingConfig`, so this artifact is always unsigned;
+it is meant for identity/manifest verification and manual test-device
+installs, not distribution. `verify-apk.sh` fails closed if the applicationId,
+version name/code, or permission set don't match this release candidate, or
+if the file isn't a well-formed APK.
+
+### CI versus the local/pre-release gates
+
+The GitHub Actions workflow (`.github/workflows/build.yml`) runs the
+container-gate on every push and pull request: formatting, lint, unit tests,
+manifest audit, and a debug assemble (`container-test.sh` and
+`container-build.sh`). It deliberately does **not** run instrumentation or the
+release build in CI, because GitHub-hosted runners don't reliably expose
+`/dev/kvm`, and an emulator without hardware acceleration is a flaky hang, not
+a gate. `container-test.sh --instrumentation` and `container-release.sh` +
+`verify-apk.sh` are **required pre-release checks** that the release owner
+runs locally (or on a runner with confirmed, reliable KVM) before tagging a
+release — they are not implied to run on every CI job.
+
 On Android, open CallGuard settings and tap **Set CallGuard as screening app**.
 The system role dialog is authoritative; CallGuard never claims the role is
 active based only on the user's intent. Unknown or unparseable caller IDs use
@@ -109,14 +137,21 @@ the configured fallback action, which defaults to allow.
 All plugin and library versions live in `gradle/libs.versions.toml`.
 Dependency locking is enabled in strict mode (`dependencyLocking` with
 `lockMode = LockMode.STRICT` in `app/build.gradle.kts`); the lockfiles
-(`app/gradle.lockfile`, `settings-gradle.lockfile`) are committed. Dependency
-verification is enforced at build time via the `--dependency-verification strict`
-flag passed by both scripts, backed by the committed
-`gradle/verification-metadata.xml` (sha-256). A fresh container build is
-dependency-locked and integrity-checked; the project does not claim
-byte-for-byte reproducibility of every Android tool output. The base image is pinned by immutable
-digest and the Android command-line tools archive is checked against Google's
-published sha-1 and size before install.
+(`app/gradle.lockfile`, `settings-gradle.lockfile`) are committed and cover
+both the debug and release resolution graphs — `app/gradle.lockfile` locks
+`releaseCompileClasspath`/`releaseRuntimeClasspath` as well as their debug
+counterparts, so `container-release.sh` resolves against the same locked,
+verified dependency set as the debug gate, not a separately-trusted one.
+Dependency verification is enforced at build time via the
+`--dependency-verification strict` flag passed by every script that invokes
+Gradle, backed by the committed `gradle/verification-metadata.xml` (sha-256).
+`verify-dependencies.sh` and CI exercise this for the debug variant; the
+release variant gets the same strict verification when `container-release.sh`
+runs, since the flag applies to the whole Gradle invocation, not one task. A
+fresh container build is dependency-locked and integrity-checked; the project
+does not claim byte-for-byte reproducibility of every Android tool output. The
+base image is pinned by immutable digest and the Android command-line tools
+archive is checked against Google's published sha-1 and size before install.
 
 ## Project layout
 
@@ -127,8 +162,10 @@ gradle/libs.versions.toml  # version catalog
 app/                       # application module (namespace studio.ainovations.callguard)
 Containerfile              # pinned, integrity-checked build image
 .devcontainer/             # VS Code dev container
-scripts/                   # build, tests, emulator, manifest, and dependency gates
+scripts/                   # build, tests, emulator, release, manifest, and dependency gates
 docs/screenshots/          # emulator-captured GUI snapshots
+metadata/                  # F-Droid release-candidate metadata (prepared, not submitted)
+NOTICE                     # third-party attribution for bundled dependencies
 ```
 
 ## Trust model and important limits
@@ -178,6 +215,16 @@ CallGuard is **not yet listed on F-Droid**. Do not mistake a GitHub Actions
 build badge or a locally produced APK for an F-Droid release. The first public
 release will include this Apache-2.0 license, source-build instructions,
 metadata, and release provenance required by the selected distribution channel.
+
+F-Droid metadata for this release candidate is **prepared, not submitted**:
+`metadata/studio.ainovations.callguard.yml` declares the Apache-2.0 license,
+public source/issue-tracker URLs, and non-sensitive build instructions, but
+its `commit` field is an explicit placeholder rather than a real commit —
+F-Droid's build tooling needs an immutable reference to the exact reviewed
+source, which doesn't exist until this branch is merged and tagged. No file
+in this repository submits, requests, or implies submission to F-Droid; that
+remains a separate release-owner step once the placeholder is replaced with
+a real tag or commit.
 
 ## Development principles
 
