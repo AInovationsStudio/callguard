@@ -29,8 +29,7 @@ import studio.ainovations.callguard.domain.RuleMatcher
  * still validated by Room's annotation processor at compile time (a typo in
  * the SQL or an unsupported column type fails `kaptDebugUnitTestKotlin`);
  * what this suite does not cover is a live SQLite engine actually executing
- * that SQL, which is left to a future Android instrumentation test (see the
- * persistence layer report's concerns).
+ * that SQL, which is left to a future Android instrumentation test.
  */
 class RuleRepositoryTest {
 
@@ -285,7 +284,7 @@ class RuleRepositoryTest {
     }
 
     /**
-     * Regression test for the persistence layer review's Important finding:
+     * Regression test for the concurrency contract:
      * [RuleRepository.refreshFromDisk] and [RuleRepository.replaceRules] both
      * read-or-write disk then publish to the same snapshot reference, so
      * without a concurrency guard a [refreshFromDisk] started before a
@@ -392,9 +391,7 @@ class RuleRepositoryTest {
     @Test
     fun disabledInvalidRuleDoesNotBreakReplaceOrEvaluation() = runBlocking {
         // A disabled rule with a malformed matcher must not prevent a valid
-        // enabled rule from being persisted, compiled, and matched — the
-        // same rule compiler "disabled rules are skipped before compilation"
-        // contract, exercised through the repository.
+        // enabled rule from being persisted, compiled, and matched.
         val repo = RuleRepository(FakeRuleDao())
         repo.replaceRules(
             listOf(

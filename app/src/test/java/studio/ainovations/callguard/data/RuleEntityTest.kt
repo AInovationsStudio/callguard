@@ -10,16 +10,14 @@ import studio.ainovations.callguard.domain.RuleMatcher
 /**
  * Unit tests for [RuleEntity]'s mapping functions and [RuleEntityConverters],
  * focused on the [RuleMatcher.SpecificNumbers] comma-delimited CSV encoding a
- * persistence layer review flagged as a latent round-trip risk: joining a set of
- * canonical digit strings with a comma is only collision-free because every
- * element is guaranteed to be a non-empty, digit-only string. A value
- * containing a comma would otherwise round-trip as a *different* set of
- * numbers (silent corruption, not a crash). These tests pin the invariant at
- * both persistence boundaries it crosses — [BlockingRule.toEntity] and
- * [RuleEntityConverters.fromStringSet] — independent of
- * [studio.ainovations.callguard.domain.RuleCompiler]'s upstream validation,
- * which only runs for enabled rules (see [RuleRepositoryTest] for the
- * disabled-rule persistence path this closes).
+ * comma-delimited encoding: joining a set of canonical digit strings is only
+ * collision-free because every element is guaranteed to be a non-empty,
+ * digit-only string. A value containing a comma would otherwise round-trip as
+ * a different set of numbers (silent corruption, not a crash). These tests
+ * pin the invariant at both persistence boundaries it crosses —
+ * [BlockingRule.toEntity] and [RuleEntityConverters.fromStringSet] —
+ * independently of [studio.ainovations.callguard.domain.RuleCompiler]'s
+ * upstream validation, which only runs for enabled rules.
  */
 class RuleEntityTest {
 

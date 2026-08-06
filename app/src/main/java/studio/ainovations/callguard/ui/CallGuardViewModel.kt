@@ -36,7 +36,7 @@ import java.util.UUID
  * maps to exactly one [RuleMatcher] variant; the label is what the UI shows
  * instead of the underlying type name (e.g. "Starts with", never "prefix").
  * [ADVANCED_PATTERN] (regex) is listed last so the guided shapes stay
- * primary, per the brief's "keep advanced syntax secondary" direction.
+ * primary and advanced syntax remains available without dominating the flow.
  */
 enum class WizardMatcherType(val label: String) {
     EXACT_NUMBER("Exact number"),
@@ -606,7 +606,8 @@ class CallGuardViewModel(
     /**
      * A pattern that is syntactically valid but matches nearly every number.
      * This is a heuristic allowlist check, not a general "how broad is this
-     * regex" analysis — see the concurrency and UI work report's Concerns for its scope.
+     * regex" analysis; it deliberately covers only the most obvious broad
+     * patterns.
      */
     private fun broadRegexWarningFor(pattern: String): String? {
         val trimmed = pattern.trim()

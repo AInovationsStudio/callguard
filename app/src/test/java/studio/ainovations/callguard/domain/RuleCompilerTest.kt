@@ -244,7 +244,7 @@ class RuleCompilerTest {
         assertNull(result.ruleId)
     }
 
-    // --- Regression tests added during rule compiler review fix ---
+    // --- Regression tests for disabled-rule compilation ---
 
     @Test
     fun disabledInvalidRuleDoesNotBreakEvaluation() {

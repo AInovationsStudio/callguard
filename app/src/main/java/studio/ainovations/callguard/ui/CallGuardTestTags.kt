@@ -1,10 +1,9 @@
 package studio.ainovations.callguard.ui
 
 /**
- * Shared Compose semantics test tags. Not part of the concurrency and UI work brief's file
- * list; added so production composables and
- * `androidTest/.../ui/RuleWizardTest.kt` reference the same string literal
- * instead of duplicating it on both sides.
+ * Shared Compose semantics test tags. Production composables and
+ * `androidTest/.../ui/RuleWizardTest.kt` use the same identifiers instead of
+ * duplicating string literals.
  */
 object CallGuardTestTags {
     const val ADD_RULE_BUTTON = "add_rule_button"

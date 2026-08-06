@@ -191,9 +191,9 @@ That means:
 - no analytics, no account requirement, and no network dependency in the
   screening path.
 
-The review process and other model-assisted reviews are advisory. They produce
-transcripts and hypotheses; deterministic tests, source inspection, and human
-release judgment decide what ships.
+Automated checks are evidence, not a substitute for source inspection and human
+release judgment. Every release decision remains reviewable from the source,
+tests, and build artifacts.
 
 ## Contributing
 

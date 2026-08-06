@@ -18,9 +18,9 @@ import studio.ainovations.callguard.domain.MatchResult
 /**
  * Manual "test a number" section: routes [testInput] through
  * [CallGuardViewModel.onPreviewTested] (never a hand-rolled matcher check
- * here) and renders whatever [MatchResult] comes back. Per the brief's
- * interface, this composable is the one place [MatchResult.action],
- * [MatchResult.ruleId], and [MatchResult.explanation] are shown.
+ * here) and renders whatever [MatchResult] comes back. This composable is the
+ * one place [MatchResult.action], [MatchResult.ruleId], and
+ * [MatchResult.explanation] are shown.
  */
 @Composable
 fun RulePreviewScreen(

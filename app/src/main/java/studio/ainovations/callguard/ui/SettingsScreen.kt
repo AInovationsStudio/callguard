@@ -30,11 +30,11 @@ import studio.ainovations.callguard.ui.theme.GlassCard
 import studio.ainovations.callguard.ui.theme.irisBackdrop
 
 /**
- * Settings and permission repair. Per the brief: shows the active
- * call-screening role, default region, unknown-number behavior, and
- * contact-rule status; when contacts permission is missing, explains that
- * contact matching is disabled and offers an explicit repair action rather
- * than silently disabling it.
+ * Settings and permission repair. Shows the active call-screening role,
+ * default region, unknown-number behavior, and contact-rule status. When
+ * contacts permission is missing, it explains that contact matching is
+ * disabled and offers an explicit repair action rather than silently
+ * disabling it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

@@ -34,10 +34,10 @@ import studio.ainovations.callguard.ui.theme.GlassCard
 import studio.ainovations.callguard.ui.theme.irisBackdrop
 
 /**
- * The enabled-rule list. Per the brief: each row shows the action, a
- * human-readable matcher description, enabled state, priority, and
- * edit/delete controls; advanced matcher syntax (e.g. a raw regex) is folded
- * into [RuleListItem.matcherDescription] rather than shown as its own field,
+ * The enabled-rule list. Each row shows the action, a human-readable matcher
+ * description, enabled state, priority, and edit/delete controls. Advanced
+ * matcher syntax (e.g. a raw regex) is folded into
+ * [RuleListItem.matcherDescription] rather than shown as its own field,
  * keeping the guided presentation primary.
  */
 @OptIn(ExperimentalMaterial3Api::class)

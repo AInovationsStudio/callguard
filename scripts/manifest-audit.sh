@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Manifest permission audit for CallGuard.
-# screening service declares only READ_CONTACTS for the explicitly user-triggered contact
+# The app declares only READ_CONTACTS for its explicitly user-triggered contact
 # rule flow. This script fails if any other permission is present, if the
 # launcher activity is missing or not exported, or if a second activity is
 # declared. The call-screening service must be protected by the platform
@@ -15,7 +15,7 @@ if [[ ! -f "$MANIFEST" ]]; then
     exit 1
 fi
 
-# 1. Only READ_CONTACTS is allowed in screening service.
+# 1. Only READ_CONTACTS is allowed.
 PERM_COUNT=$(grep -c "<uses-permission" "$MANIFEST" || true)
 if [[ "$PERM_COUNT" -ne 1 ]] || ! grep -q 'android.permission.READ_CONTACTS' "$MANIFEST"; then
     echo "error: manifest must declare exactly android.permission.READ_CONTACTS and no other permissions." >&2

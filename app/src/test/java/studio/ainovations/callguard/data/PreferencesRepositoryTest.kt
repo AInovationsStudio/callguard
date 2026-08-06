@@ -16,9 +16,9 @@ import studio.ainovations.callguard.domain.RuleAction
 /**
  * Unit tests for [PreferencesRepository] against an in-memory [FakeDataStore].
  *
- * Beyond the persistence layer brief's required [RuleRepositoryTest]: [PreferencesRepository]
- * is simple enough to test hermetically (no file I/O, no Android runtime)
- * that skipping coverage would leave a new production file untested.
+ * [PreferencesRepository] is simple enough to test hermetically (no file I/O,
+ * no Android runtime), so its persistence defaults and round trips stay
+ * covered without requiring a device.
  */
 class PreferencesRepositoryTest {
 

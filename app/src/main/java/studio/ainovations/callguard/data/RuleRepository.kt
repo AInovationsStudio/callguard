@@ -84,11 +84,9 @@ class RuleRepository(
      * Serialized against [replaceRules] via [writeMutex]; see the class
      * doc's Concurrency section.
      *
-     * This method is not part of the interface the persistence layer brief requires
-     * ([observeRules], [replaceRules], [compileSnapshot]); it exists so a
-     * real application can recover persisted rules across a process
-     * restart. A caller that always calls [replaceRules] before the first
-     * [compileSnapshot] read (e.g. a test) can ignore it.
+     * This method exists so a real application can recover persisted rules
+     * across a process restart. A caller that always calls [replaceRules]
+     * before the first [compileSnapshot] read (e.g. a test) can ignore it.
      */
     suspend fun refreshFromDisk(): RuleSnapshot = bootstrapSnapshot()
 
