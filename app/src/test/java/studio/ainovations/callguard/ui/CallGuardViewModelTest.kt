@@ -2,6 +2,7 @@ package studio.ainovations.callguard.ui
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.emptyPreferences
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -10,12 +11,14 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import studio.ainovations.callguard.data.PreferencesRepository
 import studio.ainovations.callguard.data.RuleDao
@@ -92,6 +95,51 @@ class CallGuardViewModelTest {
         assertFalse(dao.rules().any { it.enabled })
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun revokingContactsPermissionClearsSilentlyRetainedContactMatching() = runBlocking {
+        val dataStore = FakeDataStore()
+        val granted = java.util.concurrent.atomic.AtomicBoolean(true)
+        val viewModel = CallGuardViewModel(
+            ruleRepository = RuleRepository(FakeRuleDao()),
+            preferencesRepository = PreferencesRepository(dataStore),
+            normalizer = PhoneNormalizer(deviceRegion = { "US" }),
+            contactsPermissionGranted = { granted.get() },
+            scope = CoroutineScope(Dispatchers.Default.limitedParallelism(2)),
+        )
+
+        // Establish the precondition: contacts access is granted and the user
+        // has turned contact matching on, so a stale "enabled" preference is
+        // persisted in DataStore.
+        viewModel.onContactMatchingToggled(true)
+        withTimeout(3_000) {
+            while (!viewModel.uiState.value.settings.contactMatchingEnabled) delay(10)
+        }
+        assertTrue(viewModel.uiState.value.settings.contactsPermissionGranted)
+        assertTrue(viewModel.uiState.value.settings.contactMatchingEnabled)
+        assertEquals(true, dataStore.data.first()[KEY_CONTACT_MATCHING_ENABLED])
+
+        // Revoke contacts permission (the platform callback now reports false).
+        granted.set(false)
+        viewModel.refreshPermissionState()
+
+        // The UI state must make the disabled condition explicit: contact
+        // matching is off, not silently retained.
+        assertFalse(viewModel.uiState.value.settings.contactsPermissionGranted)
+        assertFalse(
+            "contact matching must be cleared in UI state after revocation",
+            viewModel.uiState.value.settings.contactMatchingEnabled,
+        )
+
+        // The persisted preference must also be explicitly disabled so the
+        // screening service (which reads DataStore) cannot leave matching
+        // silently on after revocation.
+        withTimeout(3_000) {
+            while (dataStore.data.first()[KEY_CONTACT_MATCHING_ENABLED] != false) delay(10)
+        }
+        assertEquals(false, dataStore.data.first()[KEY_CONTACT_MATCHING_ENABLED])
+    }
+
     private fun rule(id: String, prefix: String) = BlockingRule(
         id = id,
         name = id,
@@ -128,5 +176,9 @@ class CallGuardViewModelTest {
             state.value = updated
             return updated
         }
+    }
+
+    private companion object {
+        val KEY_CONTACT_MATCHING_ENABLED = booleanPreferencesKey("contact_matching_enabled")
     }
 }

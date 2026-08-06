@@ -94,7 +94,7 @@ class CallGuardScreeningService : CallScreeningService() {
         val state = runtimeState.current()
         debugLog(ScreeningDiagnostics.entry(state.loaded, state.rules.ruleCount))
         refreshContactsIfNeeded(state.preferences.defaultRegion)
-        val result = runCatching {
+        val result = resolveCallSafely {
             decisionResolver.resolve(
                 snapshot = state.rules,
                 rawNumber = callDetails.handle?.schemeSpecificPart,
@@ -103,13 +103,6 @@ class CallGuardScreeningService : CallScreeningService() {
                 contacts = state.contacts.numbers,
                 contactsAvailable = state.contacts.available,
                 runtimeLoaded = state.loaded,
-            )
-        }.getOrElse {
-            MatchResult(
-                action = state.preferences.unknownNumberAction,
-                ruleId = null,
-                explanation = "Screening encountered an internal error; the last known " +
-                    "fallback action was applied.",
             )
         }
         debugLog(
@@ -185,3 +178,27 @@ class CallGuardScreeningService : CallScreeningService() {
         const val TAG = "CallGuardScreening"
     }
 }
+
+/**
+ * Evaluates [resolve] against the screening callback and fails open with
+ * [RuleAction.ALLOW] on any unexpected exception.
+ *
+ * The configured unknown-number action is reserved for unavailable or
+ * unparseable caller identity (see [ScreeningDecisionResolver]); an
+ * unexpected internal error must never apply a blocking fallback, because a
+ * crash in resolution must preserve the phone's normal behavior rather than
+ * silently drop a call. The diagnostic explanation is deliberately
+ * privacy-safe: it carries no number, contact, rule, or exception detail.
+ *
+ * Extracted to a top-level internal function so the fail-open policy is
+ * unit-testable without an Android [CallScreeningService] harness.
+ */
+internal fun resolveCallSafely(resolve: () -> MatchResult): MatchResult =
+    runCatching { resolve() }.getOrElse {
+        MatchResult(
+            action = RuleAction.ALLOW,
+            ruleId = null,
+            explanation = "Screening encountered an internal error; the call was allowed " +
+                "to preserve the phone's normal behavior.",
+        )
+    }

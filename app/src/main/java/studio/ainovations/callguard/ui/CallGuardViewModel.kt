@@ -231,14 +231,25 @@ class CallGuardViewModel(
     /** Re-reads the injected permission/role callbacks. Called on init and whenever Settings opens. */
     fun refreshPermissionState() {
         val contactsGranted = contactsPermissionGranted()
+        val previouslyEnabled = _uiState.value.settings.contactMatchingEnabled
         _uiState.update { state ->
             state.copy(
                 settings = state.settings.copy(
                     contactsPermissionGranted = contactsGranted,
                     screeningRoleStatus = screeningRoleStatus(),
+                    // Make the disabled condition explicit in UI state: when
+                    // contacts access is gone, contact matching is not "on",
+                    // even if a stale persisted preference has not yet been
+                    // overwritten. This keeps the screening service and the
+                    // Settings surface from silently retaining an active
+                    // contact-matching preference after revocation.
+                    contactMatchingEnabled = if (contactsGranted) state.settings.contactMatchingEnabled else false,
                 ),
                 wizard = recomputeWizard(state.wizard, state.rules, contactsGranted),
             )
+        }
+        if (!contactsGranted && previouslyEnabled) {
+            scope.launch { preferencesRepository.setContactMatchingEnabled(false) }
         }
     }
 

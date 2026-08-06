@@ -148,8 +148,9 @@ fun SettingsScreen(
                         }
                     } else {
                         Text(
-                            "Contacts access is not granted, so contact rules cannot run. " +
-                                "CallGuard never treats this as \"match everyone.\"",
+                            "Contacts access is not granted, so contact matching is turned off. " +
+                                "CallGuard never treats this as \"match everyone.\" " +
+                                "Grant contacts access below to re-enable matching against your contacts.",
                             modifier = Modifier.testTag(CallGuardTestTags.SETTINGS_CONTACTS_PERMISSION_STATUS),
                         )
                         Button(

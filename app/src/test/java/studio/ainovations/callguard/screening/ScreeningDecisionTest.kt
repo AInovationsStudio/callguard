@@ -7,6 +7,7 @@ import org.junit.Test
 import studio.ainovations.callguard.data.CallGuardPreferences
 import studio.ainovations.callguard.data.RuleSnapshot
 import studio.ainovations.callguard.domain.BlockingRule
+import studio.ainovations.callguard.domain.MatchResult
 import studio.ainovations.callguard.domain.RuleAction
 import studio.ainovations.callguard.domain.RuleMatcher
 import studio.ainovations.callguard.phone.PhoneNormalizer
@@ -200,6 +201,27 @@ class ScreeningDecisionTest {
         assertNull(result.ruleId)
         assertTrue(result.explanation.contains("contact", ignoreCase = true))
         assertTrue(result.explanation.contains("unavailable", ignoreCase = true))
+    }
+
+    @Test
+    fun unexpectedResolverErrorFailsOpenWithAllowNeverConfiguredBlock() {
+        // The configured fallback for unavailable/unparseable identity may be
+        // BLOCK (see unknownNumberUsesConfiguredSafeDefault), but an
+        // unexpected exception in the screening callback must still fail open
+        // with ALLOW — never the configured blocking fallback.
+        val result = resolveCallSafely { throw IllegalStateException("resolver crashed") }
+
+        assertEquals(RuleAction.ALLOW, result.action)
+        assertNull(result.ruleId)
+        assertTrue(result.explanation.contains("error", ignoreCase = true))
+    }
+
+    @Test
+    fun resolveCallSafelyPassesThroughSuccessfulResult() {
+        val expected = MatchResult(RuleAction.BLOCK, "block-prefix", "matched")
+        val result = resolveCallSafely { expected }
+
+        assertEquals(expected, result)
     }
 
     private fun resolve(
