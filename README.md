@@ -32,7 +32,7 @@ The visual language follows AInovations' light canvas, dark ink, and restrained
 iridescent accent: calm enough for a utility, distinctive enough to feel
 intentional.
 
-The MVP includes a guided Compose rule editor, country-aware normalization,
+CallGuard includes a guided Compose rule editor, country-aware normalization,
 Room persistence, and an Android `CallScreeningService`. Screening is inactive
 until the user selects CallGuard as the system call-screening app. Contact
 matching is optional and requires an explicit contacts permission grant. Blocked

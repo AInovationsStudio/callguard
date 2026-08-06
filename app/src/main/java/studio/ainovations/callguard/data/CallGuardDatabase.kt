@@ -11,7 +11,7 @@ import androidx.room.TypeConverters
  * [RuleEntity] rows (rule definitions and canonical matcher values); no
  * call audio, message content, contacts export, or raw phone history.
  *
- * `exportSchema` is `false`: the MVP has a single schema version and no
+ * `exportSchema` is `false`: CallGuard has a single schema version and no
  * migrations to validate yet. Set it to `true` and configure
  * `room.schemaLocation` once a version-2 migration is introduced.
  */

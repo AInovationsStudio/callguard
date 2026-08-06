@@ -24,7 +24,7 @@ val Context.callGuardDataStore: DataStore<Preferences> by preferencesDataStore(n
 /**
  * User preferences that are not [studio.ainovations.callguard.domain.BlockingRule]s:
  * the default phone-number region, the action for an unknown/unparseable
- * number, and whether contact matching is enabled. The MVP does not persist
+ * number, and whether contact matching is enabled. CallGuard does not persist
  * call-screening history; there is no field here for it, and none of this
  * repository's state is call/contact data itself.
  */
