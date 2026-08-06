@@ -91,17 +91,18 @@ Check dependency integrity directly:
 Build and verify the unsigned release candidate:
 
 ```bash
-./scripts/container-release.sh   # clean assembleRelease in the pinned container
-./scripts/verify-apk.sh          # checks applicationId, version, and permissions
+./scripts/container-release.sh   # clean assembleRelease + inline APK verification
+./scripts/verify-apk.sh          # re-check the release artifact (optional)
 ```
 
-`container-release.sh` produces
-`app/build/outputs/apk/release/app-release-unsigned.apk`. The release build
-type has no configured `signingConfig`, so this artifact is always unsigned;
-it is meant for identity/manifest verification and manual test-device
-installs, not distribution. `verify-apk.sh` fails closed if the applicationId,
-version name/code, or permission set don't match this release candidate, or
-if the file isn't a well-formed APK.
+`container-release.sh` produces and verifies
+`app/build/outputs/apk/release/app-release-unsigned.apk` in one container
+invocation. The release build type has no configured `signingConfig`, so this
+artifact is always unsigned; it is meant for identity/manifest verification
+and manual test-device installs, not distribution. `verify-apk.sh` fails
+closed if the applicationId, version name/code, merged permission set
+(including AGP's synthetic receiver permission), debuggable flag, or APK
+structure don't match this release candidate. Debug APKs are rejected.
 
 ### CI versus the local/pre-release gates
 

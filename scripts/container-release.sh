@@ -12,6 +12,7 @@ ROOT="$PWD"
 
 IMAGE_TAG="callguard-android:api34-emu-v2"
 GRADLE_VOLUME="callguard-gradle-cache"
+RELEASE_APK="app/build/outputs/apk/release/app-release-unsigned.apk"
 
 ENGINE="${CONTAINER_ENGINE:-}"
 if [[ -z "$ENGINE" ]]; then
@@ -42,7 +43,10 @@ if ! "$ENGINE" image inspect "$IMAGE_TAG" >/dev/null 2>&1; then
 fi
 
 # `clean` first so a stale APK from a previous build type/version can never
-# be mistaken for the current release candidate's artifact.
+# be mistaken for the current release candidate's artifact. Verification runs
+# in the same container invocation via verify-apk.sh --direct so the freshly
+# built artifact is checked before success is reported, without spawning a
+# nested container.
 "$ENGINE" run --rm \
     -v "$ROOT:/workspace:Z" \
     -v "${GRADLE_VOL}" \
@@ -54,11 +58,10 @@ fi
     "${USERNS_ARGS[@]}" \
     --user developer \
     "$IMAGE_TAG" \
-    ./gradlew --no-daemon --dependency-verification strict --stacktrace clean assembleRelease
+    bash -lc "./gradlew --no-daemon --dependency-verification strict --stacktrace clean assembleRelease && scripts/verify-apk.sh --direct \"$RELEASE_APK\""
 
-APK="app/build/outputs/apk/release/app-release-unsigned.apk"
-if [[ ! -f "$APK" ]]; then
-    echo "error: expected unsigned release APK not found at $APK" >&2
+if [[ ! -f "$RELEASE_APK" ]]; then
+    echo "error: expected unsigned release APK not found at $RELEASE_APK" >&2
     exit 1
 fi
-echo "[container-release] OK: $APK (unsigned)"
+echo "[container-release] OK: $RELEASE_APK (unsigned, verified)"
