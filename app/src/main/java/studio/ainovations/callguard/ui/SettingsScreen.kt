@@ -1,5 +1,6 @@
 package studio.ainovations.callguard.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,12 +23,32 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
+import studio.ainovations.callguard.BuildConfig
 import studio.ainovations.callguard.domain.RuleAction
 import studio.ainovations.callguard.ui.theme.BrandColors
 import studio.ainovations.callguard.ui.theme.BrandFooter
 import studio.ainovations.callguard.ui.theme.GlassCard
 import studio.ainovations.callguard.ui.theme.irisBackdrop
+
+/** Shared user-facing copy aligned with README product language. */
+internal object CallGuardUiCopy {
+    const val SCREENING_ROLE_CTA = "Set CallGuard as screening app"
+    const val CONTACTS_REPAIR_CTA = "Fix contacts access"
+    const val CONTACTS_PERMISSION_WARNING =
+        "Contact-based rules need Contacts access. Without it, CallGuard skips contact matching " +
+            "and uses your configured fallback for those callers."
+    const val CONTACTS_NOT_GRANTED_STATUS =
+        "Contacts access is not granted, so contact matching is turned off. " +
+            "CallGuard never treats this as \"match everyone.\" " +
+            "Grant contacts access below to re-enable matching against your contacts."
+    const val CONTACTS_GRANTED_STATUS = "Contacts access is granted."
+    const val NEEDS_CONTACTS_ACCESS = "Needs contacts access"
+    const val REPO_URL = "https://github.com/AInovationsStudio/callguard"
+}
 
 /**
  * Settings and permission repair. Shows the active call-screening role,
@@ -47,8 +68,11 @@ fun SettingsScreen(
     onRepairContactsPermission: () -> Unit,
     onRequestScreeningRole: () -> Unit = {},
     onBack: () -> Unit,
+    silenceSupported: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
+    BackHandler(onBack = onBack)
+
     Scaffold(
         modifier = modifier.irisBackdrop(),
         topBar = {
@@ -89,7 +113,7 @@ fun SettingsScreen(
                             onClick = onRequestScreeningRole,
                             modifier = Modifier.testTag(CallGuardTestTags.SETTINGS_SCREENING_ROLE_BUTTON),
                         ) {
-                            Text("Set CallGuard as screening app")
+                            Text(CallGuardUiCopy.SCREENING_ROLE_CTA)
                         }
                     }
                 }
@@ -114,13 +138,18 @@ fun SettingsScreen(
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("Unknown or invalid numbers", style = MaterialTheme.typography.titleSmall)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        RuleAction.entries.forEach { action ->
-                            FilterChip(
-                                selected = state.unknownNumberAction == action,
-                                onClick = { onUnknownNumberActionChanged(action) },
-                                label = { Text(action.name.lowercase().replaceFirstChar { it.uppercase() }) },
-                            )
-                        }
+                        RuleAction.entries
+                            .filter { it != RuleAction.SILENCE || silenceSupported }
+                            .forEach { action ->
+                                FilterChip(
+                                    selected = state.unknownNumberAction == action,
+                                    onClick = { onUnknownNumberActionChanged(action) },
+                                    label = { Text(action.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                                    modifier = Modifier.testTag(
+                                        CallGuardTestTags.SETTINGS_UNKNOWN_ACTION_CHIP_PREFIX + action.name,
+                                    ),
+                                )
+                            }
                     }
                 }
             }
@@ -128,38 +157,78 @@ fun SettingsScreen(
             GlassCard(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("Contact rules", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        "Contact-based blocking requires Contacts access. Without it, Android may skip " +
-                            "screening calls from saved contacts.",
-                        color = BrandColors.InkSoft,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier
-                            .padding(top = 4.dp)
-                            .testTag(CallGuardTestTags.SETTINGS_CONTACTS_PERMISSION_WARNING),
-                    )
+                    if (!state.contactsPermissionGranted) {
+                        Text(
+                            text = CallGuardUiCopy.CONTACTS_PERMISSION_WARNING,
+                            color = BrandColors.InkSoft,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier
+                                .padding(top = 4.dp)
+                                .testTag(CallGuardTestTags.SETTINGS_CONTACTS_PERMISSION_WARNING),
+                        )
+                    }
                     if (state.contactsPermissionGranted) {
                         Text(
-                            "Contacts access is granted.",
+                            CallGuardUiCopy.CONTACTS_GRANTED_STATUS,
                             modifier = Modifier.testTag(CallGuardTestTags.SETTINGS_CONTACTS_PERMISSION_STATUS),
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Match rules against your contacts")
-                            Switch(checked = state.contactMatchingEnabled, onCheckedChange = onContactMatchingToggled)
+                            Switch(
+                                checked = state.contactMatchingEnabled,
+                                onCheckedChange = onContactMatchingToggled,
+                                modifier = Modifier
+                                    .testTag(CallGuardTestTags.SETTINGS_CONTACT_MATCHING_SWITCH)
+                                    .semantics {
+                                        contentDescription = "Match rules against your contacts"
+                                        stateDescription = if (state.contactMatchingEnabled) {
+                                            "On"
+                                        } else {
+                                            "Off"
+                                        }
+                                    },
+                            )
                         }
                     } else {
                         Text(
-                            "Contacts access is not granted, so contact matching is turned off. " +
-                                "CallGuard never treats this as \"match everyone.\" " +
-                                "Grant contacts access below to re-enable matching against your contacts.",
+                            CallGuardUiCopy.CONTACTS_NOT_GRANTED_STATUS,
                             modifier = Modifier.testTag(CallGuardTestTags.SETTINGS_CONTACTS_PERMISSION_STATUS),
                         )
                         Button(
                             onClick = onRepairContactsPermission,
                             modifier = Modifier.testTag(CallGuardTestTags.SETTINGS_CONTACTS_REPAIR_BUTTON),
                         ) {
-                            Text("Fix contacts access")
+                            Text(CallGuardUiCopy.CONTACTS_REPAIR_CTA)
                         }
                     }
+                }
+            }
+
+            GlassCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(CallGuardTestTags.SETTINGS_ABOUT_CARD),
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("About", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        text = "Version ${BuildConfig.VERSION_NAME}",
+                        modifier = Modifier.testTag(CallGuardTestTags.SETTINGS_ABOUT_VERSION),
+                    )
+                    Text(
+                        "CallGuard screens calls locally on your device. No account, analytics, or " +
+                            "network access is required for screening.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Text(
+                        "Licensed under Apache-2.0.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Text(
+                        text = CallGuardUiCopy.REPO_URL,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = BrandColors.InkSoft,
+                    )
                 }
             }
         }
@@ -168,6 +237,7 @@ fun SettingsScreen(
 
 private fun screeningRoleDescription(status: ScreeningRoleStatus): String = when (status) {
     ScreeningRoleStatus.Active -> "CallGuard is the active call-screening app."
-    ScreeningRoleStatus.NotActive -> "CallGuard is not protecting calls yet. Rules will not run until you activate it."
+    ScreeningRoleStatus.NotActive ->
+        "CallGuard is not protecting calls yet. Rules will not run until you activate it."
     ScreeningRoleStatus.Unsupported -> "Call screening is not available on this device."
 }

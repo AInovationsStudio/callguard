@@ -28,6 +28,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import studio.ainovations.callguard.ui.theme.BrandColors
 import studio.ainovations.callguard.ui.theme.GlassCard
@@ -74,7 +77,9 @@ fun RuleListScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onAddRule,
-                modifier = Modifier.testTag(CallGuardTestTags.ADD_RULE_BUTTON),
+                modifier = Modifier
+                    .testTag(CallGuardTestTags.ADD_RULE_BUTTON)
+                    .semantics { contentDescription = "Add rule" },
                 containerColor = BrandColors.Ink,
                 contentColor = BrandColors.Canvas,
             ) {
@@ -96,7 +101,7 @@ fun RuleListScreen(
                             Text(
                                 text = when (screeningRoleStatus) {
                                     ScreeningRoleStatus.NotActive ->
-                                        "CallGuard is ready, but it is not protecting calls yet."
+                                        "CallGuard is not protecting calls yet."
                                     ScreeningRoleStatus.Unsupported ->
                                         "Call screening is not available on this device."
                                     ScreeningRoleStatus.Active -> ""
@@ -104,9 +109,9 @@ fun RuleListScreen(
                                 style = MaterialTheme.typography.titleSmall,
                             )
                             if (screeningRoleStatus == ScreeningRoleStatus.NotActive) {
-                                Text("Set CallGuard as your screening app before relying on these rules.")
+                                Text("Set CallGuard as the screening app before relying on these rules.")
                                 Button(onClick = onRequestScreeningRole) {
-                                    Text("Activate CallGuard")
+                                    Text(CallGuardUiCopy.SCREENING_ROLE_CTA)
                                 }
                             }
                         }
@@ -185,7 +190,7 @@ private fun RuleRow(
                 }
                 if (item.requiresContactsPermission && !contactsPermissionGranted) {
                     Text(
-                        text = "Needs contacts access",
+                        text = CallGuardUiCopy.NEEDS_CONTACTS_ACCESS,
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.labelSmall,
                     )
@@ -194,7 +199,12 @@ private fun RuleRow(
             Switch(
                 checked = item.enabled,
                 onCheckedChange = { onToggleRule(item.id, it) },
-                modifier = Modifier.testTag(CallGuardTestTags.RULE_TOGGLE_PREFIX + item.id),
+                modifier = Modifier
+                    .testTag(CallGuardTestTags.RULE_TOGGLE_PREFIX + item.id)
+                    .semantics {
+                        contentDescription = "Rule enabled, ${item.name}"
+                        stateDescription = if (item.enabled) "On" else "Off"
+                    },
             )
             TextButton(
                 onClick = { onEditRule(item.id) },

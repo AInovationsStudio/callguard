@@ -1,5 +1,6 @@
 package studio.ainovations.callguard.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -56,6 +57,8 @@ fun RuleWizardScreen(
     silenceSupported: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
+    BackHandler(onBack = onCancel)
+
     Column(
         modifier = modifier
             .irisBackdrop()
@@ -155,7 +158,7 @@ fun RuleWizardScreen(
                 onClick = onRequestContactsPermission,
                 modifier = Modifier.testTag(CallGuardTestTags.WIZARD_CONTACTS_PERMISSION_BUTTON),
             ) {
-                Text("Enable contacts access")
+                Text(CallGuardUiCopy.CONTACTS_REPAIR_CTA)
             }
         }
 

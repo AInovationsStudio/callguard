@@ -113,6 +113,7 @@ fun CallGuardApp(viewModel: CallGuardViewModel = rememberDefaultCallGuardViewMod
                     onRepairContactsPermission = viewModel::onContactsPermissionRepairRequested,
                     onRequestScreeningRole = viewModel::onScreeningRoleRequested,
                     onBack = viewModel::onRuleListOpened,
+                    silenceSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q,
                 )
             }
         }

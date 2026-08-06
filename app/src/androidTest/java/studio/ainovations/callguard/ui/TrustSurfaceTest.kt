@@ -1,12 +1,16 @@
 package studio.ainovations.callguard.ui
 
+import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Rule
 import org.junit.Test
@@ -17,10 +21,10 @@ import studio.ainovations.callguard.ui.theme.AINOVATIONS_WORDMARK_TEST_TAG
 @RunWith(AndroidJUnit4::class)
 class TrustSurfaceTest {
     @get:Rule
-    val composeRule = createComposeRule()
+    val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
-    fun inactiveScreeningRoleIsVisibleOnRuleList() {
+    fun inactiveScreeningRoleUsesConsistentActivationCopy() {
         composeRule.setContent {
             RuleListScreen(
                 items = emptyList(),
@@ -36,7 +40,8 @@ class TrustSurfaceTest {
 
         composeRule.onNodeWithTag(CallGuardTestTags.RULE_LIST_SCREENING_STATUS)
             .assertIsDisplayed()
-        composeRule.onNodeWithText("Activate CallGuard").assertIsDisplayed()
+        composeRule.onNodeWithText(CallGuardUiCopy.SCREENING_ROLE_CTA).assertIsDisplayed()
+        composeRule.onNodeWithText("CallGuard is not protecting calls yet.").assertIsDisplayed()
     }
 
     @Test
@@ -86,12 +91,13 @@ class TrustSurfaceTest {
         }
 
         composeRule.onNodeWithTag(CallGuardTestTags.ADD_RULE_BUTTON).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Add rule").assertIsDisplayed()
         composeRule.onAllNodesWithTag(AINOVATIONS_WORDMARK_TEST_TAG).assertCountEquals(0)
         composeRule.onAllNodesWithTag(AINOVATIONS_FOOTER_TEST_TAG).assertCountEquals(0)
     }
 
     @Test
-    fun settingsUsesCenteredTitleAndBrandedFooter() {
+    fun settingsUsesCenteredTitleBrandedFooterAndAboutCard() {
         composeRule.setContent {
             SettingsScreen(
                 state = SettingsUiState(),
@@ -107,8 +113,122 @@ class TrustSurfaceTest {
         composeRule.onNodeWithText("Settings").assertIsDisplayed()
         composeRule.onNodeWithTag(AINOVATIONS_WORDMARK_TEST_TAG).assertIsDisplayed()
         composeRule.onNodeWithTag(AINOVATIONS_FOOTER_TEST_TAG).assertIsDisplayed()
-        composeRule.onNodeWithTag(CallGuardTestTags.SETTINGS_CONTACTS_PERMISSION_WARNING)
+        composeRule.onNodeWithTag(CallGuardTestTags.SETTINGS_ABOUT_CARD)
+            .performScrollTo()
             .assertIsDisplayed()
+        composeRule.onNodeWithTag(CallGuardTestTags.SETTINGS_ABOUT_VERSION)
+            .performScrollTo()
+            .assertTextEquals("Version 0.1.0")
+        composeRule.onNodeWithText("Licensed under Apache-2.0.")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(CallGuardUiCopy.REPO_URL)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(
+            "CallGuard screens calls locally on your device. No account, analytics, or " +
+                "network access is required for screening.",
+        )
+            .performScrollTo()
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun contactsWarningIsHiddenWhenPermissionGranted() {
+        composeRule.setContent {
+            SettingsScreen(
+                state = SettingsUiState(contactsPermissionGranted = true, contactMatchingEnabled = true),
+                availableRegions = listOf("US"),
+                onDefaultRegionChanged = {},
+                onUnknownNumberActionChanged = {},
+                onContactMatchingToggled = {},
+                onRepairContactsPermission = {},
+                onBack = {},
+            )
+        }
+
+        composeRule.onNodeWithTag(CallGuardTestTags.SETTINGS_CONTACTS_PERMISSION_WARNING)
+            .assertDoesNotExist()
+        composeRule.onNodeWithText(CallGuardUiCopy.CONTACTS_GRANTED_STATUS).assertIsDisplayed()
+        composeRule.onNodeWithTag(CallGuardTestTags.SETTINGS_CONTACT_MATCHING_SWITCH)
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun contactsWarningUsesCallGuardFallbackContractWhenPermissionMissing() {
+        composeRule.setContent {
+            SettingsScreen(
+                state = SettingsUiState(contactsPermissionGranted = false),
+                availableRegions = listOf("US"),
+                onDefaultRegionChanged = {},
+                onUnknownNumberActionChanged = {},
+                onContactMatchingToggled = {},
+                onRepairContactsPermission = {},
+                onBack = {},
+            )
+        }
+
+        composeRule.onNodeWithTag(CallGuardTestTags.SETTINGS_CONTACTS_PERMISSION_WARNING)
+            .assertTextEquals(CallGuardUiCopy.CONTACTS_PERMISSION_WARNING)
+        composeRule.onNodeWithText(CallGuardUiCopy.CONTACTS_REPAIR_CTA).assertIsDisplayed()
+    }
+
+    @Test
+    fun settingsScreeningRoleUsesConsistentActivationCopy() {
+        composeRule.setContent {
+            SettingsScreen(
+                state = SettingsUiState(screeningRoleStatus = ScreeningRoleStatus.NotActive),
+                availableRegions = emptyList(),
+                onDefaultRegionChanged = {},
+                onUnknownNumberActionChanged = {},
+                onContactMatchingToggled = {},
+                onRepairContactsPermission = {},
+                onBack = {},
+            )
+        }
+
+        composeRule.onNodeWithText(CallGuardUiCopy.SCREENING_ROLE_CTA).assertIsDisplayed()
+    }
+
+    @Test
+    fun settingsHidesSilenceWhenPlatformDoesNotSupportIt() {
+        composeRule.setContent {
+            SettingsScreen(
+                state = SettingsUiState(),
+                availableRegions = emptyList(),
+                onDefaultRegionChanged = {},
+                onUnknownNumberActionChanged = {},
+                onContactMatchingToggled = {},
+                onRepairContactsPermission = {},
+                onBack = {},
+                silenceSupported = false,
+            )
+        }
+
+        composeRule.onAllNodesWithTag(CallGuardTestTags.SETTINGS_UNKNOWN_ACTION_CHIP_PREFIX + "SILENCE")
+            .assertCountEquals(0)
+        composeRule.onNodeWithTag(CallGuardTestTags.SETTINGS_UNKNOWN_ACTION_CHIP_PREFIX + "ALLOW")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun settingsBackHandlerRoutesToCallback() {
+        var backCount = 0
+        composeRule.setContent {
+            SettingsScreen(
+                state = SettingsUiState(),
+                availableRegions = emptyList(),
+                onDefaultRegionChanged = {},
+                onUnknownNumberActionChanged = {},
+                onContactMatchingToggled = {},
+                onRepairContactsPermission = {},
+                onBack = { backCount += 1 },
+            )
+        }
+
+        composeRule.activity.onBackPressedDispatcher.onBackPressed()
+        composeRule.waitForIdle()
+        check(backCount == 1)
     }
 
     @Test

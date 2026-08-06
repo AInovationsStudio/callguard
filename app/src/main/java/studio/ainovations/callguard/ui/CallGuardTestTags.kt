@@ -47,7 +47,11 @@ object CallGuardTestTags {
     const val SETTINGS_CONTACTS_PERMISSION_STATUS = "settings_contacts_permission_status"
     const val SETTINGS_CONTACTS_PERMISSION_WARNING = "settings_contacts_permission_warning"
     const val SETTINGS_CONTACTS_REPAIR_BUTTON = "settings_contacts_repair_button"
+    const val SETTINGS_CONTACT_MATCHING_SWITCH = "settings_contact_matching_switch"
     const val SETTINGS_SCREENING_ROLE_STATUS = "settings_screening_role_status"
     const val SETTINGS_SCREENING_ROLE_BUTTON = "settings_screening_role_button"
     const val SETTINGS_BACK_BUTTON = "settings_back_button"
+    const val SETTINGS_UNKNOWN_ACTION_CHIP_PREFIX = "settings_unknown_action_chip_"
+    const val SETTINGS_ABOUT_CARD = "settings_about_card"
+    const val SETTINGS_ABOUT_VERSION = "settings_about_version"
 }

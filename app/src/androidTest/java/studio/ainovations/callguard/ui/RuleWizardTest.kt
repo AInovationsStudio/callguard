@@ -1,5 +1,6 @@
 package studio.ainovations.callguard.ui
 
+import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -7,7 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -25,7 +26,7 @@ import studio.ainovations.callguard.domain.RuleAction
 @RunWith(AndroidJUnit4::class)
 class RuleWizardTest {
     @get:Rule
-    val composeRule = createComposeRule()
+    val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
     fun guidedFlowAcceptsStartsWithBlockAndTestsNumber() {
@@ -221,5 +222,45 @@ class RuleWizardTest {
 
         composeRule.onAllNodesWithTag(CallGuardTestTags.ACTION_CHIP_PREFIX + "SILENCE")
             .assertCountEquals(0)
+    }
+
+    @Test
+    fun wizardBackHandlerRoutesToCancelCallback() {
+        var cancelCount = 0
+        composeRule.setContent {
+            RuleWizardScreen(
+                state = WizardState(),
+                availableRegions = emptyList(),
+                onInputChanged = { _, _ -> },
+                onMatcherSelected = {},
+                onActionSelected = {},
+                onPreviewTested = {},
+                onSave = {},
+                onCancel = { cancelCount += 1 },
+            )
+        }
+
+        composeRule.activity.onBackPressedDispatcher.onBackPressed()
+        composeRule.waitForIdle()
+        check(cancelCount == 1)
+    }
+
+    @Test
+    fun contactsMatcherUsesConsistentRepairCopy() {
+        composeRule.setContent {
+            RuleWizardScreen(
+                state = WizardState(matcherType = WizardMatcherType.CONTACTS),
+                availableRegions = emptyList(),
+                onInputChanged = { _, _ -> },
+                onMatcherSelected = {},
+                onActionSelected = {},
+                onPreviewTested = {},
+                onSave = {},
+                onCancel = {},
+                contactsPermissionGranted = false,
+            )
+        }
+
+        composeRule.onNodeWithText(CallGuardUiCopy.CONTACTS_REPAIR_CTA).assertIsDisplayed()
     }
 }
