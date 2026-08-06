@@ -220,12 +220,10 @@ metadata, and release provenance required by the selected distribution channel.
 F-Droid metadata for this release candidate is **prepared, not submitted**:
 `metadata/studio.ainovations.callguard.yml` declares the Apache-2.0 license,
 public source/issue-tracker URLs, and non-sensitive build instructions, but
-its `commit` field is an explicit placeholder rather than a real commit —
-F-Droid's build tooling needs an immutable reference to the exact reviewed
-source, which doesn't exist until this branch is merged and tagged. No file
-in this repository submits, requests, or implies submission to F-Droid; that
-remains a separate release-owner step once the placeholder is replaced with
-a real tag or commit.
+its `commit` field pins the reviewed release-candidate source commit
+`fdf5ef8e863756ef736a1d73d6989030f7de769f`. No file in this repository
+submits, requests, or implies submission to F-Droid; that remains a separate
+release-owner step.
 
 ## Development principles
 

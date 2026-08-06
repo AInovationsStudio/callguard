@@ -5,13 +5,9 @@
 # as a submission, and do not add signing keys, keystores, or any other
 # credential material to this file or this repository.
 #
-# RELEASE OWNER ACTION REQUIRED before any submission:
-#   The `commit` field below is an explicit placeholder, not a real commit.
-#   F-Droid's reproducible-build tooling requires an immutable reference
-#   (a commit SHA or signed tag) to the exact source it builds. That
-#   reference cannot exist honestly until this branch is reviewed, merged,
-#   and tagged by the release owner. Replace REPLACE_WITH_RELEASE_COMMIT
-#   with that commit SHA or tag (e.g. "v0.1.0") once it exists, and verify
+# RELEASE OWNER CHECK before any submission:
+#   The `commit` field below pins the reviewed release-candidate source.
+#   Re-check that it remains the intended tag or commit, and verify
 #   `versionName`/`versionCode` below still match app/build.gradle.kts at
 #   that reference before submitting.
 
@@ -57,9 +53,8 @@ Repo: https://github.com/AInovationsStudio/callguard.git
 Builds:
   - versionName: '0.1.0'
     versionCode: 1
-    # See "RELEASE OWNER ACTION REQUIRED" above. Do not submit with this
-    # placeholder still in place.
-    commit: REPLACE_WITH_RELEASE_COMMIT
+    # Pinned release-candidate source; F-Droid submission remains separate.
+    commit: fdf5ef8e863756ef736a1d73d6989030f7de769f
     subdir: app
     gradle:
       - yes
