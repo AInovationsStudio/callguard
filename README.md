@@ -73,7 +73,7 @@ Run Compose and service contract tests on the pinned API-34 emulator:
 ./scripts/container-test.sh --instrumentation
 ```
 
-Capture the verified GUI screens:
+Capture emulator GUI screenshots:
 
 ```bash
 ./scripts/capture-screenshots.sh
@@ -166,12 +166,12 @@ The intended release path is:
 1. Source review and deterministic container gates
 2. Signed test build and device verification
 3. F-Droid metadata and reproducible-build review
-4. Public release under a clearly identified FOSS license
+4. Public release under the Apache-2.0 FOSS license
 
 CallGuard is **not yet listed on F-Droid**. Do not mistake a GitHub Actions
 build badge or a locally produced APK for an F-Droid release. The first public
-release will include the license text, source-build instructions, metadata, and
-release provenance required by the selected distribution channel.
+release will include this Apache-2.0 license, source-build instructions,
+metadata, and release provenance required by the selected distribution channel.
 
 ## Development principles
 
@@ -191,10 +191,10 @@ release judgment decide what ships.
 
 ## Contributing
 
-Before the first public release, the project will publish its FOSS license,
-contribution guidance, security contact, and release policy. Until then, issue
-reports and review notes are welcome, but pre-release builds may change without
-compatibility guarantees.
+The project is licensed under Apache-2.0. Contribution guidance, a security
+contact, and a release policy will be expanded before the first stable release.
+Until then, issue reports and review notes are welcome, but pre-release builds
+may change without compatibility guarantees.
 
 ## Project
 
