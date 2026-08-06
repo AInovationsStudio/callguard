@@ -39,15 +39,11 @@ internal object CallGuardUiCopy {
     const val SCREENING_ROLE_CTA = "Set CallGuard as screening app"
     const val SCREENING_ROLE_INACTIVE_BANNER =
         "Set CallGuard as screening app before relying on these rules."
-    const val CONTACTS_REPAIR_CTA = "Fix contacts access"
-    const val CONTACTS_PERMISSION_WARNING =
-        "Contact-based rules need Contacts access. Without it, CallGuard skips contact matching " +
-            "and uses your configured fallback for those callers."
-    const val CONTACTS_NOT_GRANTED_STATUS =
-        "Contacts access is not granted, so contact matching is turned off. " +
-            "CallGuard never treats this as \"match everyone.\" " +
-            "Grant contacts access below to re-enable matching against your contacts."
-    const val CONTACTS_GRANTED_STATUS = "Contacts access is granted."
+    const val CONTACTS_REPAIR_CTA = "Enable contacts access"
+    const val CONTACTS_RULES_DISABLED =
+        "Contact-based rules need Contacts access and stay off until you grant it. " +
+            "Enable below to match against your contacts."
+    const val CONTACTS_GRANTED_STATUS = "Contacts access is on."
     const val NEEDS_CONTACTS_ACCESS = "Needs contacts access"
     const val REPO_URL = "https://github.com/AInovationsStudio/callguard"
 }
@@ -104,7 +100,10 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             GlassCard(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     Text("Call-screening role", style = MaterialTheme.typography.titleSmall)
                     Text(
                         text = screeningRoleDescription(state.screeningRoleStatus),
@@ -122,7 +121,10 @@ fun SettingsScreen(
             }
 
             GlassCard(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     Text("Default country", style = MaterialTheme.typography.titleSmall)
                     Text(
                         "Used when a number you enter doesn't include a country code.",
@@ -137,7 +139,10 @@ fun SettingsScreen(
             }
 
             GlassCard(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     Text("Unknown or invalid numbers", style = MaterialTheme.typography.titleSmall)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         RuleAction.entries
@@ -157,21 +162,15 @@ fun SettingsScreen(
             }
 
             GlassCard(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     Text("Contact rules", style = MaterialTheme.typography.titleSmall)
-                    if (!state.contactsPermissionGranted) {
-                        Text(
-                            text = CallGuardUiCopy.CONTACTS_PERMISSION_WARNING,
-                            color = BrandColors.InkSoft,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier
-                                .padding(top = 4.dp)
-                                .testTag(CallGuardTestTags.SETTINGS_CONTACTS_PERMISSION_WARNING),
-                        )
-                    }
                     if (state.contactsPermissionGranted) {
                         Text(
-                            CallGuardUiCopy.CONTACTS_GRANTED_STATUS,
+                            text = CallGuardUiCopy.CONTACTS_GRANTED_STATUS,
+                            style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.testTag(CallGuardTestTags.SETTINGS_CONTACTS_PERMISSION_STATUS),
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -193,8 +192,9 @@ fun SettingsScreen(
                         }
                     } else {
                         Text(
-                            CallGuardUiCopy.CONTACTS_NOT_GRANTED_STATUS,
-                            modifier = Modifier.testTag(CallGuardTestTags.SETTINGS_CONTACTS_PERMISSION_STATUS),
+                            text = CallGuardUiCopy.CONTACTS_RULES_DISABLED,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.testTag(CallGuardTestTags.SETTINGS_CONTACTS_PERMISSION_WARNING),
                         )
                         Button(
                             onClick = onRepairContactsPermission,

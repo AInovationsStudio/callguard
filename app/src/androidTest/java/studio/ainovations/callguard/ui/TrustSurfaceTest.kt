@@ -172,7 +172,7 @@ class TrustSurfaceTest {
         }
 
         composeRule.onNodeWithTag(CallGuardTestTags.SETTINGS_CONTACTS_PERMISSION_WARNING)
-            .assertTextEquals(CallGuardUiCopy.CONTACTS_PERMISSION_WARNING)
+            .assertTextEquals(CallGuardUiCopy.CONTACTS_RULES_DISABLED)
         composeRule.onNodeWithText(CallGuardUiCopy.CONTACTS_REPAIR_CTA).assertIsDisplayed()
     }
 
