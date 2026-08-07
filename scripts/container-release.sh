@@ -9,6 +9,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 ROOT="$PWD"
+# shellcheck source=container-lib.sh
+source "$(dirname "$0")/container-lib.sh"
 
 IMAGE_TAG="callguard-android:api34-emu-v2"
 GRADLE_VOLUME="callguard-gradle-cache"
@@ -42,6 +44,8 @@ if ! "$ENGINE" image inspect "$IMAGE_TAG" >/dev/null 2>&1; then
     "$ENGINE" build -t "$IMAGE_TAG" -f Containerfile .
 fi
 
+container_prepare_workspace "$ROOT" "$ENGINE"
+
 # `clean` first so a stale APK from a previous build type/version can never
 # be mistaken for the current release candidate's artifact. Verification runs
 # in the same container invocation via verify-apk.sh --direct so the freshly
@@ -58,7 +62,7 @@ fi
     "${USERNS_ARGS[@]}" \
     --user developer \
     "$IMAGE_TAG" \
-    bash -lc "./gradlew --no-daemon --dependency-verification strict --stacktrace clean assembleRelease && scripts/verify-apk.sh --direct \"$RELEASE_APK\""
+    bash -lc "./gradlew --no-daemon --dependency-verification strict --stacktrace --project-cache-dir=/home/developer/.gradle/project-cache clean assembleRelease && scripts/verify-apk.sh --direct \"$RELEASE_APK\""
 
 if [[ ! -f "$RELEASE_APK" ]]; then
     echo "error: expected unsigned release APK not found at $RELEASE_APK" >&2

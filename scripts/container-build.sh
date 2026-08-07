@@ -5,6 +5,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 ROOT="$PWD"
+# shellcheck source=container-lib.sh
+source "$(dirname "$0")/container-lib.sh"
 
 IMAGE_TAG="callguard-android:api34-emu-v2"
 GRADLE_VOLUME="callguard-gradle-cache"
@@ -44,6 +46,8 @@ if ! "$ENGINE" image inspect "$IMAGE_TAG" >/dev/null 2>&1; then
     "$ENGINE" build -t "$IMAGE_TAG" -f Containerfile .
 fi
 
+container_prepare_workspace "$ROOT" "$ENGINE"
+
 mkdir -p app/build/outputs/apk/debug
 
 "$ENGINE" run --rm \
@@ -57,7 +61,8 @@ mkdir -p app/build/outputs/apk/debug
     "${USERNS_ARGS[@]}" \
     --user developer \
     "$IMAGE_TAG" \
-    ./gradlew --no-daemon --dependency-verification strict --stacktrace assembleDebug
+    ./gradlew --no-daemon --dependency-verification strict --stacktrace \
+        "${CONTAINER_GRADLE_CACHE_ARGS[@]}" assembleDebug
 
 APK="app/build/outputs/apk/debug/app-debug.apk"
 if [[ ! -f "$APK" ]]; then

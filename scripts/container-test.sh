@@ -16,6 +16,8 @@ done
 
 cd "$(dirname "$0")/.."
 ROOT="$PWD"
+# shellcheck source=container-lib.sh
+source "$(dirname "$0")/container-lib.sh"
 
 IMAGE_TAG="callguard-android:api34-emu-v2"
 GRADLE_VOLUME="callguard-gradle-cache"
@@ -36,7 +38,9 @@ case "$ENGINE" in
     docker)
         USERNS_ARGS=()
         GRADLE_VOL="${GRADLE_VOLUME}:/home/developer/.gradle:Z"
-        DEVICE_ARGS=(--device /dev/kvm)
+        # Unit-test/lint gates do not need KVM; omit the device on docker so CI
+        # runners without /dev/kvm still pass the container gate.
+        DEVICE_ARGS=()
         echo "[container-test] note: docker is best-effort; podman is the tested engine." >&2
         ;;
     *)
@@ -49,6 +53,8 @@ if ! "$ENGINE" image inspect "$IMAGE_TAG" >/dev/null 2>&1; then
     echo "[container-test] building image $IMAGE_TAG (one-time)..."
     "$ENGINE" build -t "$IMAGE_TAG" -f Containerfile .
 fi
+
+container_prepare_workspace "$ROOT" "$ENGINE"
 
 run_gradle() {
     "$ENGINE" run --rm \
@@ -63,7 +69,8 @@ run_gradle() {
         "${DEVICE_ARGS[@]}" \
         --user developer \
         "$IMAGE_TAG" \
-        ./gradlew --no-daemon --dependency-verification strict "$@"
+        ./gradlew --no-daemon --dependency-verification strict \
+            "${CONTAINER_GRADLE_CACHE_ARGS[@]}" "$@"
 }
 
 # Runs a command inside the same container/user/mounts as run_gradle, with KVM
@@ -97,6 +104,11 @@ echo "[container-test] manifest audit..."
 bash scripts/manifest-audit.sh
 
 if [[ "$RUN_INSTRUMENTATION" -eq 1 ]]; then
+    if [[ "$ENGINE" == "podman" ]]; then
+        DEVICE_ARGS=(--device /dev/kvm --group-add keep-groups)
+    else
+        DEVICE_ARGS=(--device /dev/kvm)
+    fi
     echo "[container-test] booting pinned API-34 emulator..."
     run_in_container bash -lc '
         set -euo pipefail

@@ -28,11 +28,13 @@ jobs:
       - name: Run reproducible container gate (formatting, lint, unit tests, manifest audit)
         env:
           CONTAINER_ENGINE: docker
+          CI: true
         run: ./scripts/container-test.sh
 
       - name: Assemble debug APK
         env:
           CONTAINER_ENGINE: docker
+          CI: true
         run: ./scripts/container-build.sh
 
       - name: Upload APK and reports
