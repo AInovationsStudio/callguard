@@ -24,8 +24,8 @@ container_prepare_workspace() {
                 chmod -R a+rwX "$path" 2>/dev/null || true
             fi
         done
-        mkdir -p "$root/app/build" "$root/build" "$root/.gradle"
-        chmod -R a+rwX "$root/app/build" "$root/build" "$root/.gradle" 2>/dev/null || true
+        mkdir -p "$root/app/build" "$root/build" "$root/.gradle" "$root/.kotlin"
+        chmod -R a+rwX "$root/app/build" "$root/build" "$root/.gradle" "$root/.kotlin" 2>/dev/null || true
     fi
 }
 
