@@ -10,7 +10,10 @@ container_prepare_workspace() {
     local engine="$2"
     if [[ "${CI:-}" == "true" && "$engine" == "docker" ]]; then
         echo "[container] CI/docker: making bind-mounted workspace writable for uid 1000 (developer)..." >&2
-        chmod -R a+rwX "$root"
+        # A fresh checkout is owned by the runner uid; the container writes build
+        # outputs as uid 1000. Later steps in the same job cannot chmod those
+        # artifacts, but they are already writable by the container user.
+        chmod -R a+rwX "$root" 2>/dev/null || true
     fi
 }
 
