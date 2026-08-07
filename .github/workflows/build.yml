@@ -1,14 +1,8 @@
-# This workflow runs the container-gate ONLY: formatting, lint, unit tests,
-# manifest audit, and a debug assemble, none of which need an emulator or
-# `/dev/kvm`. It intentionally does NOT run instrumentation
-# (`connectedDebugAndroidTest` / `container-test.sh --instrumentation`) or the
-# unsigned release build (`container-release.sh`) — GitHub-hosted `ubuntu-24.04`
-# runners do not reliably expose `/dev/kvm`, and an emulator boot attempt
-# without it is a flaky hang, not a gate. Instrumentation is a required
-# pre-release check the release owner runs locally/in a KVM-capable runner
-# (see README's "Reproducible container build" section); it does not run on
-# every push/PR here. Add an emulator job only once a runner with reliable
-# KVM is explicitly available and confirmed.
+# Container gate on every push/PR: formatting, lint, unit tests, source manifest
+# audit, debug assemble with merged-manifest permission verification, and an
+# unsigned release assemble with full verify-apk.sh. None of these steps need an
+# emulator or `/dev/kvm`. Instrumentation (`container-test.sh --instrumentation`)
+# remains a required pre-release check on a KVM-capable runner (see README).
 name: CallGuard build
 
 on:
@@ -21,7 +15,7 @@ permissions:
 jobs:
   container-gate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -37,13 +31,34 @@ jobs:
           CI: true
         run: ./scripts/container-build.sh
 
+      - name: Verify merged manifest permissions on debug APK
+        env:
+          CONTAINER_ENGINE: docker
+          CI: true
+        run: ./scripts/verify-apk.sh --permissions-only app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Build and verify unsigned release APK
+        env:
+          CONTAINER_ENGINE: docker
+          CI: true
+        run: ./scripts/container-release.sh
+
+      - name: Assert tracked scripts and workflow were not modified by the container
+        run: |
+          git diff --exit-code -- scripts/ .github/ || {
+            echo "error: container steps modified tracked gate scripts or workflow files" >&2
+            git diff -- scripts/ .github/ >&2
+            exit 1
+          }
+
       - name: Upload APK and reports
-        if: always()
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: callguard-debug-and-reports
           path: |
             app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/release/app-release-unsigned.apk
             app/build/reports/
             app/build/test-results/
           if-no-files-found: ignore

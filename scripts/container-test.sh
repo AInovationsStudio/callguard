@@ -56,6 +56,9 @@ fi
 
 container_prepare_workspace "$ROOT" "$ENGINE"
 
+echo "[container-test] manifest audit (source tree, before Gradle)..."
+bash scripts/manifest-audit.sh
+
 run_gradle() {
     "$ENGINE" run --rm \
         -v "$ROOT:/workspace:Z" \
@@ -99,9 +102,6 @@ run_gradle lintDebug
 
 echo "[container-test] unit tests (testDebugUnitTest)..."
 run_gradle testDebugUnitTest
-
-echo "[container-test] manifest audit..."
-bash scripts/manifest-audit.sh
 
 if [[ "$RUN_INSTRUMENTATION" -eq 1 ]]; then
     if [[ "$ENGINE" == "podman" ]]; then
@@ -156,4 +156,4 @@ if [[ "$RUN_INSTRUMENTATION" -eq 1 ]]; then
     '
 fi
 
-echo "[container-test] OK: formatting, lint, unit tests, manifest audit all passed."
+echo "[container-test] OK: formatting, lint, unit tests, and manifest audit all passed."

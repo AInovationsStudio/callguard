@@ -53,9 +53,9 @@ Repo: https://github.com/AInovationsStudio/callguard.git
 Builds:
   - versionName: '0.1.0'
     versionCode: 1
-    # Pinned release-candidate source; F-Droid submission remains separate.
-    commit: v0.1.0
-    subdir: app
+    # Pinned release-candidate source (40-char SHA); F-Droid submission remains separate.
+    commit: be1f5b2821b2990da4acc6aeec3027045f938313
+    subdir: .
     gradle:
       - yes
     # No signing config is committed to the source tree; F-Droid's own build

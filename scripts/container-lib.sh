@@ -9,11 +9,23 @@ container_prepare_workspace() {
     local root="$1"
     local engine="$2"
     if [[ "${CI:-}" == "true" && "$engine" == "docker" ]]; then
-        echo "[container] CI/docker: making bind-mounted workspace writable for uid 1000 (developer)..." >&2
+        echo "[container] CI/docker: making Gradle write paths writable for uid 1000 (developer)..." >&2
         # A fresh checkout is owned by the runner uid; the container writes build
-        # outputs as uid 1000. Later steps in the same job cannot chmod those
-        # artifacts, but they are already writable by the container user.
-        chmod -R a+rwX "$root" 2>/dev/null || true
+        # outputs as uid 1000. Scope chmod to paths Gradle actually writes instead
+        # of the entire repository tree.
+        local path
+        for path in \
+            "$root/.gradle" \
+            "$root/app/build" \
+            "$root/build" \
+            "$root/.kotlin" \
+            "$root/.idea"; do
+            if [[ -e "$path" ]]; then
+                chmod -R a+rwX "$path" 2>/dev/null || true
+            fi
+        done
+        mkdir -p "$root/app/build" "$root/build" "$root/.gradle"
+        chmod -R a+rwX "$root/app/build" "$root/build" "$root/.gradle" 2>/dev/null || true
     fi
 }
 

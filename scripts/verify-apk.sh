@@ -7,9 +7,13 @@
 # inside the same integrity-checked image used to build it, so no host
 # Android SDK is required.
 #
-# Usage: scripts/verify-apk.sh [--direct] [path/to/app.apk]
+# Usage: scripts/verify-apk.sh [--direct] [--permissions-only] [path/to/app.apk]
 #   --direct  Run `aapt` on the current machine/container without spawning a
 #             nested container. Used by container-release.sh after assembleRelease.
+#   --permissions-only
+#             Check application ID, version, and merged manifest permissions
+#             only. Skips the non-debuggable requirement (for CI debug APKs).
+#             Does not weaken the release gate invoked by container-release.sh.
 #   --self-test
 #             Run deterministic negative controls and exit (no APK argument).
 #   Defaults to the unsigned release APK produced by container-release.sh.
@@ -116,6 +120,7 @@ collect_badging() {
 verify_apk_badging() {
     local apk_display_path="$1"
     local badging="$2"
+    local permissions_only="${3:-0}"
 
     local package_line
     package_line="$(grep -m1 '^package:' <<<"$badging" || true)"
@@ -147,9 +152,13 @@ verify_apk_badging() {
         fail=1
     fi
 
+    local debuggable="no"
     if grep -q '^application-debuggable' <<<"$badging"; then
-        echo "error: APK is debuggable; release verification requires a non-debuggable artifact" >&2
-        fail=1
+        debuggable="yes"
+        if [[ "$permissions_only" -eq 0 ]]; then
+            echo "error: APK is debuggable; release verification requires a non-debuggable artifact" >&2
+            fail=1
+        fi
     fi
 
     # Parse every aapt permission line whose key begins with `uses-permission`,
@@ -183,11 +192,19 @@ verify_apk_badging() {
         exit 1
     fi
 
-    echo "[verify-apk] OK: $apk_display_path"
+    if [[ "$permissions_only" -eq 1 ]]; then
+        echo "[verify-apk] OK (permissions-only): $apk_display_path"
+    else
+        echo "[verify-apk] OK: $apk_display_path"
+    fi
     echo "  applicationId: $app_id"
     echo "  versionName:   $version_name"
     echo "  versionCode:   $version_code"
-    echo "  debuggable:    no"
+    if [[ "$permissions_only" -eq 1 ]]; then
+        echo "  debuggable:    $debuggable (not gated in permissions-only mode)"
+    else
+        echo "  debuggable:    $debuggable"
+    fi
     echo "  permissions:"
     printf '    %s\n' "${permissions[@]}"
 }
@@ -195,6 +212,7 @@ verify_apk_badging() {
 run_verify() {
     local apk_path="$1"
     local use_direct="$2"
+    local permissions_only="$3"
 
     if [[ ! -f "$apk_path" ]]; then
         echo "error: APK not found at $apk_path (run scripts/container-release.sh first)" >&2
@@ -217,7 +235,7 @@ run_verify() {
 
     local badging
     badging="$(collect_badging "$apk_rel" "$use_direct")"
-    verify_apk_badging "$apk_path" "$badging"
+    verify_apk_badging "$apk_path" "$badging" "$permissions_only"
 }
 
 run_self_test() {
@@ -259,6 +277,12 @@ run_self_test() {
     if [[ -s "$ROOT/$debug_apk" ]]; then
         expect_failure "debuggable debug APK on release verification path" \
             bash "$script" "$debug_apk"
+        if bash "$script" --permissions-only "$debug_apk" >/dev/null 2>&1; then
+            echo "[verify-apk self-test] OK: debug APK passes permissions-only mode"
+        else
+            echo "error: debug APK should pass --permissions-only verification" >&2
+            failures=1
+        fi
     else
         echo "[verify-apk self-test] skip: debuggable debug APK (debug artifact not built yet)" >&2
     fi
@@ -270,12 +294,14 @@ run_self_test() {
 }
 
 DIRECT=0
+PERMISSIONS_ONLY=0
 SELF_TEST=0
 APK_PATH=""
 
 for arg in "$@"; do
     case "$arg" in
         --direct) DIRECT=1 ;;
+        --permissions-only) PERMISSIONS_ONLY=1 ;;
         --self-test) SELF_TEST=1 ;;
         -*) echo "error: unknown option '$arg'" >&2; exit 64 ;;
         *)
@@ -298,4 +324,4 @@ if [[ "$SELF_TEST" -eq 1 ]]; then
 fi
 
 APK_PATH="${APK_PATH:-app/build/outputs/apk/release/app-release-unsigned.apk}"
-run_verify "$APK_PATH" "$DIRECT"
+run_verify "$APK_PATH" "$DIRECT" "$PERMISSIONS_ONLY"

@@ -108,14 +108,15 @@ structure don't match this release candidate. Debug APKs are rejected.
 
 The GitHub Actions workflow (`.github/workflows/build.yml`) runs the
 container-gate on every push and pull request: formatting, lint, unit tests,
-manifest audit, and a debug assemble (`container-test.sh` and
-`container-build.sh`). It deliberately does **not** run instrumentation or the
-release build in CI, because GitHub-hosted runners don't reliably expose
-`/dev/kvm`, and an emulator without hardware acceleration is a flaky hang, not
-a gate. `container-test.sh --instrumentation` and `container-release.sh` +
-`verify-apk.sh` are **required pre-release checks** that the release owner
-runs locally (or on a runner with confirmed, reliable KVM) before tagging a
-release — they are not implied to run on every CI job.
+source manifest audit, debug assemble with merged-manifest permission
+verification (`verify-apk.sh --permissions-only`), and an unsigned release
+build with full `verify-apk.sh` (`container-release.sh`). It deliberately
+does **not** run instrumentation in CI, because GitHub-hosted runners don't
+reliably expose `/dev/kvm`, and an emulator without hardware acceleration is a
+flaky hang, not a gate. `container-test.sh --instrumentation` is a **required
+pre-release check** that the release owner runs locally (or on a runner with
+confirmed, reliable KVM) before tagging a release — it is not implied to run on
+every CI job.
 
 On Android, open CallGuard settings and tap **Set CallGuard as screening app**.
 The system role dialog is authoritative; CallGuard never claims the role is
@@ -220,8 +221,8 @@ metadata, and release provenance required by the selected distribution channel.
 F-Droid metadata for this release candidate is **prepared, not submitted**:
 `metadata/studio.ainovations.callguard.yml` declares the Apache-2.0 license,
 public source/issue-tracker URLs, and non-sensitive build instructions, but
-its `commit` field pins the reviewed release-candidate source commit
-`v0.1.0`. No file in this repository
+its `commit` field pins the reviewed release-candidate source to an immutable
+40-character git SHA (not a movable tag). No file in this repository
 submits, requests, or implies submission to F-Droid; that remains a separate
 release-owner step.
 
