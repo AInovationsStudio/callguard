@@ -13,8 +13,11 @@ container_prepare_workspace() {
         # A fresh checkout is owned by the runner uid; the container writes build
         # outputs as uid 1000. Scope chmod to paths Gradle actually writes instead
         # of the entire repository tree.
+        # Gradle clean/assemble needs write access on module parents, not only
+        # build output directories (CI runner uid != container uid 1000).
         local path
         for path in \
+            "$root/app" \
             "$root/.gradle" \
             "$root/app/build" \
             "$root/build" \
@@ -25,7 +28,7 @@ container_prepare_workspace() {
             fi
         done
         mkdir -p "$root/app/build" "$root/build" "$root/.gradle" "$root/.kotlin"
-        chmod -R a+rwX "$root/app/build" "$root/build" "$root/.gradle" "$root/.kotlin" 2>/dev/null || true
+        chmod -R a+rwX "$root/app" "$root/app/build" "$root/build" "$root/.gradle" "$root/.kotlin" 2>/dev/null || true
     fi
 }
 
