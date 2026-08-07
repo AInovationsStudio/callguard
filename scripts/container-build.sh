@@ -48,8 +48,6 @@ fi
 
 container_prepare_workspace "$ROOT" "$ENGINE"
 
-mkdir -p app/build/outputs/apk/debug
-
 "$ENGINE" run --rm \
     -v "$ROOT:/workspace:Z" \
     -v "${GRADLE_VOL}" \
